@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: j178/prek-action@1382ad72dea72f9d53832f2bcb65b3e87a947204 # v3.0.1
+
+  test:
+    name: Test (${{ matrix.python }})
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+
+      - name: run the tests
+        env:
+          PYTHON: ${{ matrix.python }}
+        run: uvx --with tox-uv tox -e "$PYTHON"
+
+  build:
+    name: Build (${{ matrix.package }} / ${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: tailwindcss-bin
+            runner: ubuntu-24.04
+            method: cibuildwheel
+          - package: tailwindcss-bin
+            runner: ubuntu-24.04-arm
+            method: cibuildwheel
+          - package: tailwindcss-bin
+            runner: macos-latest
+            method: cibuildwheel
+          - package: tailwindcss-bin
+            runner: windows-latest
+            method: cibuildwheel
+          - package: tailwindcss-bin-tailwindcss-motion
+            runner: ubuntu-24.04-arm
+            method: uv
+          - package: tailwindcss-bin-tw-animate-css
+            runner: ubuntu-24.04-arm
+            method: uv
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        if: matrix.method == 'uv'
+
+      - uses: pypa/cibuildwheel@adba99c781d3746d38b3a09b1cf797965bcb7fe6 # v4.3.0
+        if: matrix.method == 'cibuildwheel'
+        with:
+          package-dir: packages/${{ matrix.package }}
+          extras: uv
+
+      - name: build the wheel
+        if: matrix.method == 'uv'
+        run: |
+          uv build --wheel --package "${{ matrix.package }}"
+          mkdir -p upload
+          cp dist/*.whl upload/
+
+      - name: stage cibuildwheel artifacts
+        if: matrix.method == 'cibuildwheel'
+        shell: bash
+        run: |
+          mkdir -p upload
+          cp wheelhouse/*.whl upload/
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheels-${{ matrix.package }}-${{ matrix.runner }}
+          path: upload/*.whl
+          if-no-files-found: error

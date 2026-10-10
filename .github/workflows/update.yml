@@ -1,0 +1,142 @@
+name: Update
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package to update (defaults to tailwindcss-bin)
+        required: false
+      version:
+        description: Upstream version (defaults to latest)
+        required: false
+
+concurrency:
+  group: ${{ github.workflow }}
+
+permissions: {}
+
+jobs:
+  update:
+    name: Update (${{ matrix.package }})
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+      pull-requests: write
+    strategy:
+      matrix:
+        package:
+          - tailwindcss-bin
+          - tailwindcss-bin-tailwindcss-motion
+          - tailwindcss-bin-tw-animate-css
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+
+      - name: update the package
+        id: update
+        env:
+          PACKAGE: ${{ inputs.package || matrix.package }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          fetch_npm_license() {
+            local npm=$1 version=$2 dest=$3
+            local tarball
+            tarball=$(curl -fsSL "https://registry.npmjs.org/$npm/$version" | jq -r .dist.tarball)
+            curl -fsSL "$tarball" | tar -xzf - -O package/LICENSE > "$dest"
+          }
+
+          if [ -n "${{ inputs.package }}" ] && [ "${{ inputs.package }}" != "$PACKAGE" ]; then
+            echo "skip"
+            exit 0
+          fi
+          dir="packages/$PACKAGE"
+          case "$PACKAGE" in
+            tailwindcss-bin)
+              repo=tailwindlabs/tailwindcss
+              version=${VERSION#v}
+              if [ -z "$version" ]; then
+                version=$(gh release view --repo "$repo" --json tagName --jq '.tagName[1:]')
+              fi
+              branch="update/$PACKAGE-v$version"
+              if grep -qx "version = \"$version\"" "$dir/pyproject.toml"; then
+                exit 0
+              fi
+              if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+                exit 0
+              fi
+              gh release view "v$version" --repo "$repo" --json assets --jq '
+                .assets[] | select(.name | startswith("tailwindcss-"))
+                | "sha256.\(.name[12:] | rtrimstr(".exe")) = \"\(
+                    .digest // error("\(.name) has no digest") | .[7:]
+                  )\""
+              ' > "$RUNNER_TEMP/pins"
+              license_file=LICENSE-tailwindcss
+              curl -fsSL "https://raw.githubusercontent.com/$repo/v$version/LICENSE" \
+                -o "$dir/$license_file"
+              sed -i \
+                -e "s/^version = \".*\"/version = \"$version\"/" \
+                -e '/^sha256\./d' \
+                -e "/^\[tool.tailwindcss-bin\]/r $RUNNER_TEMP/pins" \
+                "$dir/pyproject.toml"
+              body="https://github.com/$repo/releases/tag/v$version"
+              ;;
+            tailwindcss-bin-tw-animate-css)
+              npm=tw-animate-css
+              ;;
+            tailwindcss-bin-tailwindcss-motion)
+              npm=tailwindcss-motion
+              ;;
+          esac
+          if [ -n "${npm:-}" ]; then
+            version=${VERSION#v}
+            if [ -z "$version" ]; then
+              version=$(curl -fsSL "https://registry.npmjs.org/$npm/latest" | jq -r .version)
+            fi
+            branch="update/$PACKAGE-v$version"
+            if grep -qx "version = \"$version\"" "$dir/pyproject.toml"; then
+              exit 0
+            fi
+            if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+              exit 0
+            fi
+            integrity=$(curl -fsSL "https://registry.npmjs.org/$npm/$version" | jq -r .dist.integrity)
+            case "$PACKAGE" in
+              tailwindcss-bin-tw-animate-css) license_file=LICENSE-tw-animate-css ;;
+              tailwindcss-bin-tailwindcss-motion) license_file=LICENSE-tailwindcss-motion ;;
+            esac
+            fetch_npm_license "$npm" "$version" "$dir/$license_file"
+            sed -i \
+              -e "s/^version = \".*\"/version = \"$version\"/g" \
+              -e "s|^integrity = \".*\"|integrity = \"$integrity\"|" \
+              "$dir/pyproject.toml"
+            body="https://www.npmjs.com/package/$npm/v/$version"
+          fi
+          uv lock
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "package=$PACKAGE" >> "$GITHUB_OUTPUT"
+          echo "body=$body" >> "$GITHUB_OUTPUT"
+
+      - name: open a pull request
+        if: steps.update.outputs.version
+        env:
+          PACKAGE: ${{ steps.update.outputs.package }}
+          VERSION: ${{ steps.update.outputs.version }}
+          BRANCH: ${{ steps.update.outputs.branch }}
+          BODY: ${{ steps.update.outputs.body }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add -A
+          git commit -m "Update $PACKAGE to v$VERSION"
+          git push origin "$BRANCH"
+          gh pr create --head "$BRANCH" \
+            --title "Update $PACKAGE to v$VERSION" \
+            --body "$BODY"
