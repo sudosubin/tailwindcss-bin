@@ -1,0 +1,34 @@
+[build-system]
+build-backend = "hatchling.build"
+requires = [ "hatch-npm-vendor>=0.1,<0.2", "hatchling>=1.27" ]
+
+[project]
+name = "tailwindcss-bin-tw-animate-css"
+version = "1.4.0.dev1"
+description = "tw-animate-css for tailwindcss-bin."
+license = "MIT"
+license-files = [ "LICENSE", "LICENSE-tw-animate-css" ]
+requires-python = ">=3.8"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
+]
+dependencies = []
+entry-points."tailwindcss_bin.plugins".tw-animate-css = "tailwindcss_bin.plugins.tw_animate_css"
+
+[tool.hatch]
+build.targets.wheel.packages = [ "src/tailwindcss_bin" ]
+build.targets.wheel.hooks.npm-vendor.dependencies = [ "hatch-npm-vendor>=0.1,<0.2" ]
+
+[[tool.hatch.build.targets.wheel.hooks.npm-vendor.packages]]
+dest = "tailwindcss_bin/plugins/tw_animate_css/node_modules/tw-animate-css"
+package = "tw-animate-css"
+version = "1.4.0"
+integrity = "sha512-7bziOlRqH0hJx80h/3mbicLW7o8qLsH5+RaLR2t+OHM3D0JlWGODQKQ4cxbK7WlvmUxpcj6Kgu6EKqjrGFe3QQ=="
