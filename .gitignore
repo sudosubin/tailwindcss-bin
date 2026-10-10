@@ -4,3 +4,6 @@
 .venv/
 __pycache__/
 dist/
+packages/**/node_modules/
+upload/
+wheelhouse/
