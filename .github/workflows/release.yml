@@ -1,0 +1,143 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "tailwindcss-bin@v*"
+      - "tailwindcss-bin-*@v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  resolve:
+    name: Resolve tag
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+    outputs:
+      package: ${{ steps.parse.outputs.package }}
+      version: ${{ steps.parse.outputs.version }}
+      method: ${{ steps.parse.outputs.method }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: parse
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          package="${tag%%@*}"
+          version="${tag#*@}"
+          version="${version#v}"
+
+          if [[ ! "$package" =~ ^tailwindcss-bin(-|$) ]]; then
+            echo "unsupported package name: $package" >&2
+            exit 1
+          fi
+
+          dir="packages/$package"
+          if [ ! -f "$dir/pyproject.toml" ]; then
+            echo "no such package: $package ($dir)" >&2
+            exit 1
+          fi
+
+          expected=$(grep -m1 '^version = ' "$dir/pyproject.toml" | sed 's/^version = "\(.*\)"/\1/')
+          if [ "$expected" != "$version" ]; then
+            echo "tag version $version does not match pyproject version $expected" >&2
+            exit 1
+          fi
+
+          if [ "$package" = "tailwindcss-bin" ]; then
+            method=cibuildwheel
+          else
+            method=uv
+          fi
+
+          {
+            echo "package=$package"
+            echo "version=$version"
+            echo "method=$method"
+          } >> "$GITHUB_OUTPUT"
+
+  build-cibuildwheel:
+    name: Build (${{ needs.resolve.outputs.package }} / ${{ matrix.runner }})
+    needs: resolve
+    if: needs.resolve.outputs.method == 'cibuildwheel'
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pypa/cibuildwheel@adba99c781d3746d38b3a09b1cf797965bcb7fe6 # v4.3.0
+        with:
+          package-dir: packages/${{ needs.resolve.outputs.package }}
+          extras: uv
+
+      - name: stage cibuildwheel artifacts
+        shell: bash
+        run: |
+          mkdir -p upload
+          cp wheelhouse/*.whl upload/
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheels-${{ matrix.runner }}
+          path: upload/*.whl
+          if-no-files-found: error
+
+  build-uv:
+    name: Build (${{ needs.resolve.outputs.package }})
+    needs: resolve
+    if: needs.resolve.outputs.method == 'uv'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+
+      - name: build the wheel
+        run: |
+          uv build --wheel --package "${{ needs.resolve.outputs.package }}"
+          mkdir -p upload
+          cp dist/*.whl upload/
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheels
+          path: upload/*.whl
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    needs: [resolve, build-cibuildwheel, build-uv]
+    if: |
+      always() &&
+      needs.resolve.result == 'success' &&
+      (needs.build-cibuildwheel.result == 'success' || needs.build-cibuildwheel.result == 'skipped') &&
+      (needs.build-uv.result == 'success' || needs.build-uv.result == 'skipped') &&
+      (needs.build-cibuildwheel.result == 'success' || needs.build-uv.result == 'success')
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: wheels*
+          path: dist
+          merge-multiple: true
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
