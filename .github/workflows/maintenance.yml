@@ -45,8 +45,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           reviewers: sudosubin
           branch: maintenance/pre-commit
-          commit-message: "chore: Update pre-commit hooks"
-          title: "chore: Update pre-commit hooks"
+          commit-message: "chore: update pre-commit hooks"
+          title: "chore: update pre-commit hooks"
           body: Update the pinned pre-commit hook revisions.
 
       - name: run CI for the maintenance PR

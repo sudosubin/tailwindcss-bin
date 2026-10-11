@@ -23,3 +23,6 @@ Package versions follow upstream `X.Y.Z`. Use `.devN` for development releases
 and `.postN` for packaging-only corrections. Update tool pins and `uv.lock`
 together. Upstream updates open PRs; maintainers review and merge them before
 successful CI on `main` publishes stable or post-release versions.
+
+Use Conventional Commits for commit messages and PR titles. Use a package's
+name as the scope; omit the scope for shared changes.
