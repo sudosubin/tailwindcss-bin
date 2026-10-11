@@ -1,48 +1,15 @@
-[dependency-groups]
-dev = [
-  "hatchling>=1.27",
-  "pytest>=8",
-  "tailwindcss-bin",
-  "tailwindcss-bin-tailwindcss-motion",
-  "tailwindcss-bin-tw-animate-css",
-]
-
 [tool.uv]
-sources.tailwindcss-bin = { workspace = true }
-sources.tailwindcss-bin-tailwindcss-motion = { workspace = true }
-sources.tailwindcss-bin-tw-animate-css = { workspace = true }
 package = false
-workspace.members = [ "packages/*" ]
+
+[tool.uv.workspace]
+members = [ "packages/*" ]
 
 [tool.ruff]
 target-version = "py38"
 line-length = 80
-lint.extend-select = [ "B", "I", "UP" ]
+
+[tool.ruff.lint]
+extend-select = [ "B", "I", "UP" ]
 
 [tool.ty]
 src.include = [ "packages" ]
-
-[tool.pytest]
-ini_options.testpaths = [ "packages/tailwindcss-bin/tests" ]
-ini_options.pythonpath = [ "packages/tailwindcss-bin" ]
-
-[tool.tox]
-requires = [ "tox>=4.30", "tox-uv>=1.28" ]
-env_list = [ "3.15", "3.14", "3.13", "3.12", "3.11", "3.10", "3.9", "3.8" ]
-env_run_base.package = "skip"
-env_run_base.deps = [ "hatchling>=1.27", "packaging", "pytest>=8" ]
-env_run_base.dependency_groups = []
-env_run_base.pass_env = [ "GITHUB_TOKEN", "TAILWINDCSS_BIN_TARGET" ]
-env_run_base.commands = [
-  [
-    "bash",
-    "-euc",
-    """\
-  WHEELS=\"$TOX_ENV_DIR/wheels\"; mkdir -p \"$WHEELS\"; uv build --wheel --package tailwindcss-bin -o \"$WHEELS\"; uv \
-  build --wheel --package tailwindcss-bin-tw-animate-css -o \"$WHEELS\"; uv build --wheel --package \
-  tailwindcss-bin-tailwindcss-motion -o \"$WHEELS\"; uv pip install --reinstall \"$WHEELS\"/*.whl\
-  """,
-  ],
-  [ "pytest", { replace = "posargs", extend = true } ],
-]
-env_run_base.allowlist_externals = [ "bash" ]

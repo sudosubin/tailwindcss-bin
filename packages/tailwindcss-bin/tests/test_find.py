@@ -8,17 +8,13 @@ from tailwindcss_bin import _find_tailwindcss as find
 
 def test_finds_installed_binary():
     path = find.find_tailwindcss_bin()
-    exe = "tailwindcss" + (find.sysconfig.get_config_var("EXE") or "")
+    exe = find.bundled_cli_name()
     assert os.path.basename(path) == exe
     assert os.access(path, os.X_OK)
 
 
 def test_finds_target_install(monkeypatch, tmp_path):
-    exe = (
-        tmp_path
-        / "bin"
-        / f"tailwindcss{find.sysconfig.get_config_var('EXE') or ''}"
-    )
+    exe = tmp_path / "bin" / find.bundled_cli_name()
     exe.parent.mkdir()
     exe.touch()
     monkeypatch.setattr(find, "_wheel_script", lambda _: None)

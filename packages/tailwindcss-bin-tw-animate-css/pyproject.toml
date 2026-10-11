@@ -21,14 +21,25 @@ classifiers = [
   "Programming Language :: Python :: 3.15",
 ]
 dependencies = []
-entry-points."tailwindcss_bin.plugins".tw-animate-css = "tailwindcss_bin.plugins.tw_animate_css"
 
-[tool.hatch]
-build.targets.wheel.packages = [ "src/tailwindcss_bin" ]
-build.targets.wheel.hooks.npm-vendor.dependencies = [ "hatch-npm-vendor>=0.1,<0.2" ]
+[[project.authors]]
+name = "sudosubin"
+email = "sudosubin@gmail.com"
+
+[project.entry-points]
+"tailwindcss_bin.plugins".tw-animate-css = "tailwindcss_bin.plugins.tw_animate_css"
 
 [[tool.hatch.build.targets.wheel.hooks.npm-vendor.packages]]
 dest = "tailwindcss_bin/plugins/tw_animate_css/node_modules/tw-animate-css"
 package = "tw-animate-css"
 version = "1.4.0"
 integrity = "sha512-7bziOlRqH0hJx80h/3mbicLW7o8qLsH5+RaLR2t+OHM3D0JlWGODQKQ4cxbK7WlvmUxpcj6Kgu6EKqjrGFe3QQ=="
+
+[tool.hatch.build]
+targets.wheel.packages = [ "src/tailwindcss_bin" ]
+targets.wheel.hooks.npm-vendor.dependencies = [ "hatch-npm-vendor>=0.1,<0.2" ]
+
+[tool.tailwindcss-bin.plugin]
+npm = "tw-animate-css"
+module = "tw_animate_css"
+upstream-license = "LICENSE-tw-animate-css"

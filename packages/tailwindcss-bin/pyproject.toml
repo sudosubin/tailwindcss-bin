@@ -10,7 +10,6 @@ readme = "README.md"
 keywords = [ "binary", "cli", "css", "tailwind", "tailwindcss" ]
 license = "MIT"
 license-files = [ "LICENSE", "LICENSE-tailwindcss" ]
-authors = [ { name = "sudosubin", email = "sudosubin@gmail.com" } ]
 requires-python = ">=3.8"
 classifiers = [
   "Development Status :: 5 - Production/Stable",
@@ -32,18 +31,35 @@ classifiers = [
   "Topic :: Text Processing :: Markup",
 ]
 dependencies = []
-optional-dependencies.motion = [ "tailwindcss-bin-tailwindcss-motion>=1.1,<2" ]
-optional-dependencies.tw-animate-css = [ "tailwindcss-bin-tw-animate-css>=1.4,<2" ]
-urls.Repository = "https://github.com/sudosubin/tailwindcss-bin"
-urls.Upstream = "https://github.com/tailwindlabs/tailwindcss"
 
-[tool.hatch]
-build.targets.wheel.packages = [ "src/tailwindcss_bin" ]
-build.targets.wheel.hooks.custom = {}
+[[project.authors]]
+name = "sudosubin"
+email = "sudosubin@gmail.com"
 
-[tool.uv]
-sources.tailwindcss-bin-tailwindcss-motion = { workspace = true }
-sources.tailwindcss-bin-tw-animate-css = { workspace = true }
+[project.optional-dependencies]
+motion = [ "tailwindcss-bin-tailwindcss-motion" ]
+tw-animate-css = [ "tailwindcss-bin-tw-animate-css" ]
+
+[project.urls]
+Repository = "https://github.com/sudosubin/tailwindcss-bin"
+Upstream = "https://github.com/tailwindlabs/tailwindcss"
+
+[project.scripts]
+tailwindcss = "tailwindcss_bin.__main__:main"
+
+[dependency-groups]
+tox = [
+  "tox==4.65.1; python_version>='3.11'",
+  "tox-uv==1.28.1; python_version>='3.11'",
+]
+
+[tool.hatch.build]
+targets.wheel.packages = [ "src/tailwindcss_bin" ]
+targets.wheel.hooks.custom = {}
+
+[tool.uv.sources]
+tailwindcss-bin-tailwindcss-motion = { workspace = true }
+tailwindcss-bin-tw-animate-css = { workspace = true }
 
 [tool.cibuildwheel]
 build = "cp314-*"
@@ -51,17 +67,49 @@ archs = [ "native" ]
 build-frontend = "build[uv]"
 repair-wheel-command = ""
 test-command = "pytest tests/test_cli.py"
-test-groups = [ "dev" ]
 test-sources = [ "tests" ]
-macos.archs = [ "x86_64", "arm64" ]
 audit-command = "twine check --strict {wheel}"
 audit-requires = [ "twine" ]
 
-[tool.tailwindcss-bin]
-sha256.linux-arm64 = "55fd0b241214eff3de1e8ee4f22796662f2d2e7a49bcfca7477cfd0bac398195"
-sha256.linux-arm64-musl = "71ea4be79c9de9827545682df3e040053fb535d37c71ed2cfdedf9385a0868e0"
-sha256.linux-x64 = "dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a"
-sha256.linux-x64-musl = "a04d34ceacc8f52cbe8920ad846cdeb61d3d0021dba32db0d1f77c9d9fad7a6c"
-sha256.macos-arm64 = "cdf646702987a743464dff4d9c60fd4480d1c1e73dd819a9a67f1078815dce9d"
-sha256.macos-x64 = "7922e0953f2110c05976e3bf58f14e643d90427575e766b7d433f5f80cbee7e1"
-sha256.windows-x64 = "e0e260ce048014e9268f6237ff18f8ccf02cef521cbd0ae04e82c2cdf7aa3955"
+[tool.cibuildwheel.macos]
+archs = [ "x86_64", "arm64" ]
+
+[tool.pytest.ini_options]
+testpaths = [ "tests" ]
+pythonpath = [ "src" ]
+
+[tool.tox]
+requires = [ "tox==4.65.1", "tox-uv==1.28.1" ]
+env_list = [ "3.15", "3.14", "3.13", "3.12", "3.11", "3.10", "3.9", "3.8", "build" ]
+
+[tool.tox.env.build]
+description = "Build workspace wheels into a shared wheelhouse"
+package = "skip"
+pass_env = [ "GITHUB_TOKEN", "TAILWINDCSS_BIN_TARGET" ]
+change_dir = "{toxinidir}/../.."
+commands = [
+  [ "uv", "build", "--all-packages", "--wheel", "-o", ".tox/wheelhouse" ],
+]
+allowlist_externals = [ "uv" ]
+
+[tool.tox.env_run_base]
+package = "skip"
+deps = [
+  "hatchling>=1.27",
+  "packaging",
+  "pytest>=8",
+  "tailwindcss-bin[motion,tw-animate-css]",
+]
+pass_env = [ "TAILWINDCSS_BIN_TARGET" ]
+set_env = { UV_FIND_LINKS = "{toxinidir}/../../.tox/wheelhouse" }
+commands = [ [ "pytest", { replace = "posargs", extend = true } ] ]
+depends = [ "build" ]
+
+[tool.tailwindcss-bin.sha256]
+linux-arm64 = "55fd0b241214eff3de1e8ee4f22796662f2d2e7a49bcfca7477cfd0bac398195"
+linux-arm64-musl = "71ea4be79c9de9827545682df3e040053fb535d37c71ed2cfdedf9385a0868e0"
+linux-x64 = "dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a"
+linux-x64-musl = "a04d34ceacc8f52cbe8920ad846cdeb61d3d0021dba32db0d1f77c9d9fad7a6c"
+macos-arm64 = "cdf646702987a743464dff4d9c60fd4480d1c1e73dd819a9a67f1078815dce9d"
+macos-x64 = "7922e0953f2110c05976e3bf58f14e643d90427575e766b7d433f5f80cbee7e1"
+windows-x64 = "e0e260ce048014e9268f6237ff18f8ccf02cef521cbd0ae04e82c2cdf7aa3955"

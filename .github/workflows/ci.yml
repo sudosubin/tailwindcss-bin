@@ -21,6 +21,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+
+      - name: verify uv.lock
+        run: uv lock --check
+
       - uses: j178/prek-action@1382ad72dea72f9d53832f2bcb65b3e87a947204 # v3.0.1
 
   test:
@@ -41,7 +46,9 @@ jobs:
       - name: run the tests
         env:
           PYTHON: ${{ matrix.python }}
-        run: uvx --with tox-uv tox -e "$PYTHON"
+        run: |
+          uv sync --frozen --package tailwindcss-bin --only-group tox
+          uv run tox -c packages/tailwindcss-bin -e "$PYTHON"
 
   build:
     name: Build (${{ matrix.package }} / ${{ matrix.runner }})
@@ -85,20 +92,4 @@ jobs:
 
       - name: build the wheel
         if: matrix.method == 'uv'
-        run: |
-          uv build --wheel --package "${{ matrix.package }}"
-          mkdir -p upload
-          cp dist/*.whl upload/
-
-      - name: stage cibuildwheel artifacts
-        if: matrix.method == 'cibuildwheel'
-        shell: bash
-        run: |
-          mkdir -p upload
-          cp wheelhouse/*.whl upload/
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: wheels-${{ matrix.package }}-${{ matrix.runner }}
-          path: upload/*.whl
-          if-no-files-found: error
+        run: uv build --wheel --package "${{ matrix.package }}"

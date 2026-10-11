@@ -45,7 +45,7 @@ jobs:
             exit 1
           fi
 
-          expected=$(grep -m1 '^version = ' "$dir/pyproject.toml" | sed 's/^version = "\(.*\)"/\1/')
+          expected=$(yq -p=toml -oy '.project.version' "$dir/pyproject.toml")
           if [ "$expected" != "$version" ]; then
             echo "tag version $version does not match pyproject version $expected" >&2
             exit 1

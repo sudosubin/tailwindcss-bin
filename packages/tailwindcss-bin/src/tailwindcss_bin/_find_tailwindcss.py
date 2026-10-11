@@ -8,19 +8,17 @@ from pathlib import Path
 class TailwindcssNotFound(FileNotFoundError): ...
 
 
+def bundled_cli_name() -> str:
+    return "tailwindcss-bin" + (sysconfig.get_config_var("EXE") or "")
+
+
 def find_tailwindcss_bin() -> str:
     """Return the path to the bundled tailwindcss binary."""
-    exe = "tailwindcss" + (sysconfig.get_config_var("EXE") or "")
-    candidates: list[Path] = []
+    exe = bundled_cli_name()
     for path in (_wheel_script(exe), _venv_script(exe), _target_script(exe)):
-        if path:
-            candidates.append(path)
-    for path in candidates:
-        if path.is_file():
+        if path is not None:
             return str(path)
-
-    locations = "\n".join(f" - {path}" for path in candidates)
-    raise TailwindcssNotFound(f"Could not find tailwindcss in:\n{locations}")
+    raise TailwindcssNotFound("Could not find the bundled tailwindcss CLI")
 
 
 def _wheel_script(exe: str) -> Path | None:

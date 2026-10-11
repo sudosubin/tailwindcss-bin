@@ -40,13 +40,21 @@ def detect_target() -> str:
     return f"linux-{arch}" + ("-musl" if musl else "")
 
 
+def _github_get(url: str) -> bytes:
+    request = urllib.request.Request(url)
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        request.add_header("Authorization", f"Bearer {token}")
+    with urllib.request.urlopen(request) as response:
+        return response.read()
+
+
 def fetch(release: str, target: str, sha256: str) -> Path:
     exe = ".exe" if target.startswith("windows") else ""
     path = CACHE / f"v{release}" / f"tailwindcss-{target}{exe}"
     if not path.is_file():
         url = f"https://github.com/{REPO}/releases/download/v{release}"
-        with urllib.request.urlopen(f"{url}/{path.name}") as response:
-            data = response.read()
+        data = _github_get(f"{url}/{path.name}")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
 
@@ -95,7 +103,7 @@ class CustomBuildHook(BuildHookInterface):
         tag = TARGETS[target].format(*min_os(binary.read_bytes()))
 
         build_data["shared_scripts"][str(binary)] = (
-            f"tailwindcss{binary.suffix}"
+            f"tailwindcss-bin{binary.suffix}"
         )
         build_data["pure_python"] = False
         build_data["tag"] = f"py3-none-{tag}"

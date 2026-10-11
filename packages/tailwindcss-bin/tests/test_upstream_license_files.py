@@ -3,14 +3,17 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import sys
 import tarfile
 import urllib.request
 from io import BytesIO
-from pathlib import Path
 
+import pytest
 import tomllib
+from conftest import WORKSPACE_ROOT
 
-ROOT = Path(__file__).resolve().parents[3]
+if sys.version_info < (3, 11):
+    pytest.skip("tomllib required", allow_module_level=True)
 
 
 def npm_license(package: str, version: str) -> bytes:
@@ -34,25 +37,35 @@ def npm_license(package: str, version: str) -> bytes:
         return member.read()
 
 
-def test_plugin_upstream_license_matches_npm():
-    cases = [
-        (
-            "tailwindcss-bin-tw-animate-css",
-            "tw-animate-css",
-            "LICENSE-tw-animate-css",
-        ),
-        (
-            "tailwindcss-bin-tailwindcss-motion",
-            "tailwindcss-motion",
-            "LICENSE-tailwindcss-motion",
-        ),
-    ]
-    root_license = (ROOT / "LICENSE").read_bytes()
-    for pkg_dir, npm_name, license_name in cases:
-        package = ROOT / "packages" / pkg_dir
-        with package.joinpath("pyproject.toml").open("rb") as handle:
-            version = tomllib.load(handle)["project"]["version"]
-        on_disk = package.joinpath(license_name).read_bytes()
-        upstream = npm_license(npm_name, version)
-        assert on_disk == upstream
-        assert on_disk != root_license
+def _plugin_cases() -> list[tuple[str, str, str]]:
+    cases = []
+    for pyproject in sorted(
+        WORKSPACE_ROOT.glob("packages/tailwindcss-bin-*/pyproject.toml")
+    ):
+        with pyproject.open("rb") as handle:
+            data = tomllib.load(handle)
+        plugin = data["tool"]["tailwindcss-bin"]["plugin"]
+        cases.append(
+            (
+                pyproject.parent.name,
+                plugin["npm"],
+                plugin["upstream-license"],
+            )
+        )
+    return cases
+
+
+@pytest.mark.parametrize(
+    ("pkg_dir", "npm_name", "license_name"),
+    _plugin_cases(),
+    ids=lambda row: row[0],
+)
+def test_plugin_upstream_license_matches_npm(pkg_dir, npm_name, license_name):
+    package = WORKSPACE_ROOT / "packages" / pkg_dir
+    with package.joinpath("pyproject.toml").open("rb") as handle:
+        version = tomllib.load(handle)["project"]["version"]
+    on_disk = package.joinpath(license_name).read_bytes()
+    upstream = npm_license(npm_name, version)
+    root_license = (WORKSPACE_ROOT / "LICENSE").read_bytes()
+    assert on_disk == upstream
+    assert on_disk != root_license

@@ -21,14 +21,25 @@ classifiers = [
   "Programming Language :: Python :: 3.15",
 ]
 dependencies = []
-entry-points."tailwindcss_bin.plugins".tailwindcss-motion = "tailwindcss_bin.plugins.tailwindcss_motion"
 
-[tool.hatch]
-build.targets.wheel.packages = [ "src/tailwindcss_bin" ]
-build.targets.wheel.hooks.npm-vendor.dependencies = [ "hatch-npm-vendor>=0.1,<0.2" ]
+[[project.authors]]
+name = "sudosubin"
+email = "sudosubin@gmail.com"
+
+[project.entry-points]
+"tailwindcss_bin.plugins".tailwindcss-motion = "tailwindcss_bin.plugins.tailwindcss_motion"
 
 [[tool.hatch.build.targets.wheel.hooks.npm-vendor.packages]]
 dest = "tailwindcss_bin/plugins/tailwindcss_motion/node_modules/tailwindcss-motion"
 package = "tailwindcss-motion"
 version = "1.1.1"
 integrity = "sha512-CeeQAc5o31BuEPMyWdq/786X7QWNeifa+8khfu74Fs8lGkgEwjNYv6dGv+lRFS8FWXV5dp7F3AU9JjBXjiaQfw=="
+
+[tool.hatch.build]
+targets.wheel.packages = [ "src/tailwindcss_bin" ]
+targets.wheel.hooks.npm-vendor.dependencies = [ "hatch-npm-vendor>=0.1,<0.2" ]
+
+[tool.tailwindcss-bin.plugin]
+npm = "tailwindcss-motion"
+module = "tailwindcss_motion"
+upstream-license = "LICENSE-tailwindcss-motion"

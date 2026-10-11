@@ -7,13 +7,13 @@ The [Tailwind CSS](https://tailwindcss.com) standalone CLI, packaged as Python w
 ```sh
 uv add --dev tailwindcss-bin
 uv run tailwindcss -i input.css -o output.css --minify
-# or, with optional plugins: uv run python -m tailwindcss_bin ...
+# `tailwindcss` applies plugin NODE_PATH; `python -m tailwindcss_bin` is equivalent
 ```
 
 Optional plugins:
 
 ```sh
-uv add --dev 'tailwindcss-bin[motion,tw-animate-css]'
+uv add --dev 'tailwindcss-bin[tailwindcss-motion,tw-animate-css]'
 ```
 
 ```css
