@@ -74,11 +74,22 @@ def test_cli_wheel_licenses(cli_wheel, tmp_path):
 def _assert_plugin_wheel_licenses(distributions, package, upstream_license):
     dist = package.replace("-", "_")
     wheel = next(distributions.glob(f"{dist}-*.whl"))
+    package_root = WORKSPACE_ROOT / "packages" / package
+    config = tomllib.loads((package_root / "pyproject.toml").read_text())
+    vendor = config["tool"]["hatch"]["build"]["targets"]["wheel"]["hooks"][
+        "npm-vendor"
+    ]["packages"][0]
+    expected = (package_root / upstream_license).read_bytes()
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
-    assert license_basenames(names) == {"LICENSE", upstream_license}
-    assert not any(".." in n for n in names)
-    assert any("/node_modules/" in n and n.endswith("/LICENSE") for n in names)
+        assert license_basenames(names) == {"LICENSE", upstream_license}
+        assert not any(".." in n for n in names)
+        assert archive.read(f"{vendor['dest']}/LICENSE") == expected
+        for name in names:
+            if "/licenses/" in name:
+                source = package_root / name.split("/licenses/", 1)[1]
+                assert archive.read(name) == source.read_bytes()
+    assert expected != (WORKSPACE_ROOT / "LICENSE").read_bytes()
 
 
 @pytest.mark.parametrize(
