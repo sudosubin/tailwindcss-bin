@@ -112,6 +112,7 @@ jobs:
         if: matrix.method == 'cibuildwheel'
         with:
           package-dir: packages/${{ matrix.package }}
+          output-dir: dist
 
       - name: build the wheel
         if: matrix.method == 'uv'
@@ -121,11 +122,7 @@ jobs:
 
       - name: validate wheel metadata
         shell: bash
-        env:
-          METHOD: ${{ matrix.method }}
-        run: |
-          if [ "$METHOD" = cibuildwheel ]; then directory=wheelhouse; else directory=dist; fi
-          uv run --frozen --only-group audit twine check --strict "$directory"/*
+        run: uv run --frozen --only-group audit twine check --strict dist/*
 
   linux-baseline:
     name: Linux baseline
