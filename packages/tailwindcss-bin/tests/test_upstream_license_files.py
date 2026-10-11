@@ -14,10 +14,12 @@ from conftest import WORKSPACE_ROOT
 
 def npm_license(package: str, version: str) -> bytes:
     with urllib.request.urlopen(
-        f"https://registry.npmjs.org/{package}/{version}"
+        f"https://registry.npmjs.org/{package}/{version}", timeout=60
     ) as response:
         meta = json.load(response)
-    with urllib.request.urlopen(meta["dist"]["tarball"]) as response:
+    with urllib.request.urlopen(
+        meta["dist"]["tarball"], timeout=60
+    ) as response:
         data = response.read()
     integrity = meta["dist"]["integrity"]
     algo, digest = integrity.split("-", 1)

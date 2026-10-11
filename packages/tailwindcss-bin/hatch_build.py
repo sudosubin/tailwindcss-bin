@@ -65,7 +65,7 @@ def _github_get(url: str) -> bytes:
     token = os.environ.get("GITHUB_TOKEN")
     if token:
         request.add_header("Authorization", f"Bearer {token}")
-    with urllib.request.urlopen(request) as response:
+    with urllib.request.urlopen(request, timeout=60) as response:
         return response.read()
 
 
