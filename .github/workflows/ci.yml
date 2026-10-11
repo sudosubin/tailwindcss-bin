@@ -125,10 +125,24 @@ jobs:
         run: uv run --frozen --only-group audit twine check --strict dist/*
 
   linux-baseline:
-    name: Linux baseline
+    name: Linux baseline (${{ matrix.image }})
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            libc: gnu
+            image: debian:stretch-slim
+          - target: linux-x64-musl
+            libc: musl
+            image: alpine:3.24
+    env:
+      TAILWINDCSS_BIN_TARGET: ${{ matrix.target }}
+      LIBC: ${{ matrix.libc }}
+      IMAGE: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -137,24 +151,32 @@ jobs:
           version-file: uv.lock
           python-version: "3.14"
 
-      - name: build wheels for both Linux runtimes
+      - name: build wheels for the Linux runtime
         run: |
           mkdir -p .tox
           uv export --frozen --only-group build --no-emit-project -o .tox/build-constraints.txt
-          for target in linux-x64 linux-x64-musl; do
-            TAILWINDCSS_BIN_TARGET="$target" uv build --wheel --package tailwindcss-bin --out-dir .tox/linux-wheelhouse --build-constraint .tox/build-constraints.txt --require-hashes
-          done
-          uv build --wheel --package tailwindcss-bin-tailwindcss-motion --out-dir .tox/linux-wheelhouse --build-constraint .tox/build-constraints.txt --require-hashes
-          uv build --wheel --package tailwindcss-bin-tw-animate-css --out-dir .tox/linux-wheelhouse --build-constraint .tox/build-constraints.txt --require-hashes
+          uv export --frozen --only-group test --no-emit-project -o .tox/test-requirements.txt
+          uv build --wheel --all-packages --out-dir ".tox/linux-wheelhouse/$TAILWINDCSS_BIN_TARGET" --build-constraint .tox/build-constraints.txt --require-hashes
 
-      - name: test CSS, plugins, and native watch on Linux baselines
-        env:
-          TAILWINDCSS_BIN_BASELINE_WHEELHOUSE: .tox/linux-wheelhouse
+      - name: prepare Python for the Linux runtime
+        run: uv python install "cpython-3.14-linux-x86_64-$LIBC" --install-dir "$RUNNER_TEMP/python" --no-bin
+
+      # Node actions require newer glibc, so only the tests run in the image.
+      - name: test the installed wheels in the Linux runtime
         run: |
-          uv sync --frozen --only-group test
-          uv run --frozen --only-group test pytest \
-            packages/tailwindcss-bin/tests/test_plugins.py::test_plugins_minify \
-            packages/tailwindcss-bin/tests/test_plugins.py::test_plugins_watch
+          docker run --rm -i --workdir /project \
+            -v "$GITHUB_WORKSPACE:/project:ro" \
+            -v "$GITHUB_WORKSPACE/.tox/linux-wheelhouse/$TAILWINDCSS_BIN_TARGET:/wheels:ro" \
+            -v "$RUNNER_TEMP/python/cpython-3.14-linux-x86_64-$LIBC:/python:ro" \
+            "$IMAGE" sh -s <<'SH'
+          set -eu
+          if [ -f /etc/alpine-release ]; then apk add --no-cache libstdc++ libgcc; fi
+          /python/bin/python3.14 -m venv /venv
+          /venv/bin/python -m pip install --require-hashes -r .tox/test-requirements.txt
+          /venv/bin/python -m pip install --no-index --no-deps /wheels/*.whl
+          exec /venv/bin/python -m pytest -p no:cacheprovider \
+            packages/tailwindcss-bin/tests/test_cli.py packages/tailwindcss-bin/tests/test_plugins.py
+          SH
 
   check:
     name: Check

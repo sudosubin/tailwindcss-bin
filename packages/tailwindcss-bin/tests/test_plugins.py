@@ -19,19 +19,19 @@ def test_both_plugins_are_installed():
 
 
 @pytest.fixture
-def plugin_project(write_source, monkeypatch):
+def plugin_project(tmp_path, monkeypatch):
     monkeypatch.delenv("NODE_PATH", raising=False)
-    write_source(
-        "input.css",
+    (tmp_path / "input.css").write_text(
         '@import "tailwindcss";\n'
         '@import "tw-animate-css";\n'
         '@plugin "tailwindcss-motion";\n',
+        encoding="utf-8",
     )
-    write_source(
-        "index.html",
+    (tmp_path / "index.html").write_text(
         '<p class="animate-in motion-preset-fade bg-red-500 md:flex"></p>',
+        encoding="utf-8",
     )
-    return write_source
+    return tmp_path
 
 
 def assert_plugin_css(css):
@@ -44,45 +44,45 @@ def assert_plugin_css(css):
         assert selector in css
 
 
-def test_plugins_compile(tmp_path, cli_command, plugin_project):
+def test_plugins_compile(cli_command, plugin_project):
     if Path(cli_command[0]).name == bundled_cli_name():
         apply_node_path()
     out = run_cmd(
         cli_command + ["-i", "input.css"],
-        cwd=tmp_path,
+        cwd=plugin_project,
         env=os.environ.copy(),
         check=True,
     ).stdout
     assert_plugin_css(out)
 
 
-def test_plugins_minify(tmp_path, native_cli_command, plugin_project):
+def test_plugins_minify(native_cli_command, plugin_project):
     apply_node_path()
     out = run_cmd(
         native_cli_command + ["-i", "input.css", "--minify"],
-        cwd=tmp_path,
+        cwd=plugin_project,
         check=True,
     ).stdout
     assert_plugin_css(out)
 
 
-def test_plugins_watch(tmp_path, native_cli_command, plugin_project):
+def test_plugins_watch(native_cli_command, plugin_project):
     apply_node_path()
-    output = tmp_path / "output.css"
-    with (tmp_path / "watch.log").open("w", encoding="utf-8") as log:
+    output = plugin_project / "output.css"
+    with (plugin_project / "watch.log").open("w", encoding="utf-8") as log:
         process = subprocess.Popen(
             native_cli_command
             + ["-i", "input.css", "-o", "output.css", "--watch=always"],
-            cwd=tmp_path,
+            cwd=plugin_project,
             stdin=subprocess.DEVNULL,
             stdout=log,
             stderr=log,
         )
         try:
             assert_plugin_css(wait_for_css(process, output, ".bg-red-500"))
-            plugin_project(
-                "index.html",
+            (plugin_project / "index.html").write_text(
                 '<p class="animate-in motion-preset-fade bg-blue-500"></p>',
+                encoding="utf-8",
             )
             css = wait_for_css(process, output, ".bg-blue-500")
             assert ".animate-in" in css
