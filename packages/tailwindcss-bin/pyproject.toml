@@ -4,7 +4,7 @@ requires = [ "hatchling>=1.27" ]
 
 [project]
 name = "tailwindcss-bin"
-version = "4.3.3.dev1"
+version = "4.3.3"
 description = "The Tailwind CSS standalone CLI, packaged as Python wheels."
 readme = "README.md"
 keywords = [ "binary", "cli", "css", "tailwind", "tailwindcss" ]
