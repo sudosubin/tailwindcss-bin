@@ -10,6 +10,9 @@ import sysconfig
 import urllib.request
 from pathlib import Path
 
+from auditwheel.architecture import Architecture
+from auditwheel.libc import Libc
+from auditwheel.policy import WheelPolicies
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 from packaging.version import Version
 
@@ -23,17 +26,6 @@ TARGETS = {
     "macos-x64": "macosx_{}_{}_x86_64",
     "windows-x64": "win_amd64",
 }
-# Shared x86_64/aarch64 C++ limits from auditwheel's manylinux policies.
-MANYLINUX_CXX = (
-    ((2, 17), (3, 4, 19), (1, 3, 7)),
-    ((2, 24), (3, 4, 22), (1, 3, 10)),
-    ((2, 27), (3, 4, 24), (1, 3, 11)),
-    ((2, 31), (3, 4, 28), (1, 3, 12)),
-    ((2, 34), (3, 4, 29), (1, 3, 13)),
-    ((2, 35), (3, 4, 30), (1, 3, 13)),
-    ((2, 39), (3, 4, 33), (1, 3, 15)),
-    ((2, 42), (3, 4, 34), (1, 3, 15)),
-)
 
 
 def detect_target() -> str:
@@ -89,7 +81,7 @@ def fetch(release: str, target: str, sha256: str) -> Path:
     return path
 
 
-def min_os(data: bytes) -> tuple[int, int]:
+def min_os(data: bytes, arch: Architecture) -> tuple[int, int]:
     """Return the minimum macOS or manylinux baseline for the binary."""
     if data[:4] == b"\xcf\xfa\xed\xfe":
         (ncmds,) = struct.unpack_from("<I", data, 16)
@@ -106,22 +98,27 @@ def min_os(data: bytes) -> tuple[int, int]:
             offset += size
         raise ValueError("no minimum macOS version")
 
-    glibc = re.findall(rb"GLIBC_(\d+)\.(\d+)", data)
-    requirements = []
-    for family in (b"GLIBCXX", b"CXXABI"):
-        versions = re.findall(family + rb"_(\d+(?:\.\d+)+)", data)
-        requirements.append(
-            max(
-                (tuple(map(int, value.split(b"."))) for value in versions),
-                default=(0,),
-            )
+    # Scan embedded native modules as well as the executable's own symbols.
+    symbols = {
+        symbol.decode("ascii")
+        for symbol in re.findall(
+            rb"\b(?:GLIBC(?:XX)?|CXXABI)_\d+(?:\.\d+)+\b", data
         )
-    glibcxx, cxxabi = requirements
-    for baseline, max_glibcxx, max_cxxabi in MANYLINUX_CXX:
-        if glibcxx <= max_glibcxx and cxxabi <= max_cxxabi:
-            return max([baseline, *((int(a), int(b)) for a, b in glibc)])
-    raise ValueError(
-        "binary requires a newer C++ ABI; update the manylinux policy limits"
+    }
+    policies = WheelPolicies(libc=Libc.GLIBC, arch=arch)
+    policy = policies.versioned_symbols_policy({"binary": symbols})
+    if not policy.name.startswith("manylinux_"):
+        raise ValueError(
+            "no compatible manylinux policy for binary; update auditwheel"
+        )
+    major, minor = policy.name.split("_")[1:3]
+    glibc = re.findall(rb"GLIBC_(\d+)\.(\d+)", data)
+    return max(
+        [
+            (2, 17),
+            (int(major), int(minor)),
+            *((int(a), int(b)) for a, b in glibc),
+        ]
     )
 
 
@@ -136,7 +133,12 @@ class CustomBuildHook(BuildHookInterface):
         binary = fetch(release, target, pins[target])
         tag = TARGETS[target]
         if "{}" in tag:
-            tag = tag.format(*min_os(binary.read_bytes()))
+            arch = (
+                Architecture.aarch64
+                if target.endswith("arm64")
+                else Architecture.x86_64
+            )
+            tag = tag.format(*min_os(binary.read_bytes(), arch))
 
         build_data["shared_scripts"][str(binary)] = (
             f"tailwindcss-bin{binary.suffix}"

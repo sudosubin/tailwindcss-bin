@@ -5,6 +5,7 @@ from pathlib import Path
 
 import hatch_build
 import pytest
+from auditwheel.architecture import Architecture
 from hatchling.builders.wheel import WheelBuilder
 from hatchling.metadata.core import ProjectMetadata
 
@@ -88,31 +89,93 @@ def test_fetch_rejects_mismatch(monkeypatch, tmp_path):
     assert not cached.exists()
 
 
+@pytest.mark.parametrize("arch", [Architecture.x86_64, Architecture.aarch64])
 @pytest.mark.parametrize(
     ("data", "expected"),
     [
-        (elf(b"GLIBC_2.2.5\0GLIBC_2.28\0"), (2, 28)),
-        (elf(b"GLIBC_2.5\0"), (2, 17)),
         (elf(), (2, 17)),
+        (elf(b"GLIBC_2.17\0GLIBCXX_TUNABLES\0"), (2, 17)),
         (elf(b"GLIBC_2.17\0GLIBCXX_3.4.19\0CXXABI_1.3.7\0"), (2, 17)),
         (elf(b"GLIBC_2.17\0GLIBCXX_3.4.22\0CXXABI_1.3.9\0"), (2, 24)),
         (elf(b"GLIBC_2.17\0CXXABI_1.3.8\0"), (2, 24)),
         (elf(b"GLIBC_2.28\0GLIBCXX_3.4.22\0"), (2, 28)),
         (elf(b"GLIBC_2.17\0GLIBCXX_3.4.28\0"), (2, 31)),
         (elf(b"GLIBC_2.17\0GLIBCXX_3.4.9\0"), (2, 17)),
+        (
+            elf(b"GLIBC_2.17\0") + elf(b"GLIBCXX_3.4.22\0CXXABI_1.3.9\0"),
+            (2, 24),
+        ),
+    ],
+)
+def test_min_os_linux(data, expected, arch):
+    assert hatch_build.min_os(data, arch) == expected
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        (elf(b"GLIBC_2.2.5\0GLIBC_2.28\0"), (2, 28)),
+        (elf(b"GLIBC_2.5\0"), (2, 17)),
+    ],
+)
+def test_min_os_x86_64_legacy_glibc(data, expected):
+    assert hatch_build.min_os(data, Architecture.x86_64) == expected
+
+
+def test_min_os_preserves_aarch64_glibc_requirement():
+    data = elf(b"GLIBC_2.18\0")
+    assert hatch_build.min_os(data, Architecture.aarch64) == (2, 18)
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
         (macho((10, 15)), (10, 15)),
         (macho((13, 0)), (13, 0)),
         (macho((13, 3)), (14, 0)),
     ],
 )
-def test_min_os(data, expected):
-    assert hatch_build.min_os(data) == expected
+def test_min_os_macos(data, expected):
+    assert hatch_build.min_os(data, Architecture.aarch64) == expected
 
 
-@pytest.mark.parametrize("symbol", [b"GLIBCXX_3.4.35", b"CXXABI_1.3.16"])
-def test_min_os_rejects_unknown_cxx_policy(symbol):
-    with pytest.raises(ValueError, match="update the manylinux policy"):
-        hatch_build.min_os(elf(symbol))
+@pytest.mark.parametrize("arch", [Architecture.x86_64, Architecture.aarch64])
+@pytest.mark.parametrize(
+    "symbol", [b"GLIBC_2.99", b"GLIBCXX_3.4.35", b"CXXABI_1.3.16"]
+)
+def test_min_os_rejects_unknown_manylinux_policy(symbol, arch):
+    with pytest.raises(ValueError, match="no compatible manylinux policy"):
+        hatch_build.min_os(elf(symbol), arch)
+
+
+@pytest.mark.parametrize("host", ["darwin", "win32"])
+@pytest.mark.parametrize(
+    ("target", "tag"),
+    [
+        ("linux-x64", "manylinux_2_27_x86_64"),
+        ("linux-arm64", "manylinux_2_26_aarch64"),
+    ],
+)
+def test_linux_target_override_uses_target_architecture(
+    monkeypatch, tmp_path, host, target, tag
+):
+    binary = tmp_path / "tailwindcss"
+    binary.write_bytes(elf(b"GLIBC_2.17\0GLIBCXX_3.4.24\0CXXABI_1.3.11\0"))
+    monkeypatch.setenv("TAILWINDCSS_BIN_TARGET", target)
+    monkeypatch.setattr(hatch_build.sys, "platform", host)
+    monkeypatch.setattr(
+        hatch_build.platform,
+        "machine",
+        lambda: "arm64" if target == "linux-x64" else "x86_64",
+    )
+    monkeypatch.setattr(hatch_build, "fetch", lambda *_: binary)
+    builder = WheelBuilder(str(ROOT))
+    hook = hatch_build.CustomBuildHook(
+        str(ROOT), {}, builder.config, builder.metadata, str(tmp_path), "wheel"
+    )
+    build_data = {"shared_scripts": {}}
+    hook.initialize("standard", build_data)
+    assert build_data["tag"] == f"py3-none-{tag}"
 
 
 @pytest.mark.parametrize(
