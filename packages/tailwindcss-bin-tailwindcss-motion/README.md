@@ -1,5 +1,8 @@
 # tailwindcss-bin-tailwindcss-motion
 
+[![version](https://badgen.net/pypi/v/tailwindcss-bin-tailwindcss-motion?label=version)](https://pypi.org/project/tailwindcss-bin-tailwindcss-motion/)
+[![license](https://badgen.net/github/license/sudosubin/tailwindcss-bin?color=green)](https://github.com/sudosubin/tailwindcss-bin/blob/main/packages/tailwindcss-bin-tailwindcss-motion/LICENSE)
+
 The [tailwindcss-motion](https://www.npmjs.com/package/tailwindcss-motion) plugin, bundled for
 [tailwindcss-bin](https://github.com/sudosubin/tailwindcss-bin). No Node.js
 installation is required.

@@ -1,5 +1,8 @@
 # tailwindcss-bin
 
+[![version](https://badgen.net/pypi/v/tailwindcss-bin?label=version)](https://pypi.org/project/tailwindcss-bin/)
+[![license](https://badgen.net/github/license/sudosubin/tailwindcss-bin?color=green)](LICENSE)
+
 The [Tailwind CSS](https://tailwindcss.com) standalone CLI and optional plugins,
 packaged as Python wheels. Python 3.11 or newer is required; Node.js and npm are
 not needed to run the bundled CLI.
