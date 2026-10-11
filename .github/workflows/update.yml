@@ -59,7 +59,7 @@ jobs:
           version=${version:-$(gh release view --repo tailwindlabs/tailwindcss --json tagName --jq '.tagName[1:]')}
           branch="update/$PACKAGE-v$version"
           current=$(uv version --package "$PACKAGE" --short)
-          if [ "$current" = "$version" ] || git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+          if [ "$current" = "$version" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -81,7 +81,7 @@ jobs:
           version=${version:-$(curl -fsSL "https://registry.npmjs.org/$npm/latest" | jq -r .version)}
           branch="update/$PACKAGE-v$version"
           current=$(uv version --package "$PACKAGE" --short)
-          if [ "$current" = "$version" ] || git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+          if [ "$current" = "$version" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -139,6 +139,7 @@ jobs:
           steps.plan-plugin.outputs.changed == 'true'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          assignees: sudosubin
           branch: ${{ steps.plan-core.outputs.branch || steps.plan-plugin.outputs.branch }}
           commit-message: >-
             feat(${{ matrix.package }}): Update ${{ matrix.package }} to v${{ steps.plan-core.outputs.version || steps.plan-plugin.outputs.version }}
