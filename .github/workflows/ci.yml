@@ -112,7 +112,6 @@ jobs:
         if: matrix.method == 'cibuildwheel'
         with:
           package-dir: packages/${{ matrix.package }}
-          extras: uv
 
       - name: build the wheel
         if: matrix.method == 'uv'

@@ -132,7 +132,6 @@ jobs:
       - uses: pypa/cibuildwheel@b3395e271a35f73dad77f21802abe9b986dfe299 # v4.3.1
         with:
           package-dir: packages/${{ needs.resolve.outputs.package }}
-          extras: uv
 
       - name: build and validate the source distribution
         if: matrix.runner == 'ubuntu-24.04-arm'
