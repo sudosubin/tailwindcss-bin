@@ -6,6 +6,7 @@ requires = [ "hatch-npm-vendor>=0.1,<0.2", "hatchling>=1.27" ]
 name = "tailwindcss-bin-tw-animate-css"
 version = "1.4.0.dev1"
 description = "tw-animate-css for tailwindcss-bin."
+readme = "README.md"
 license = "MIT"
 license-files = [ "LICENSE", "LICENSE-tw-animate-css" ]
 requires-python = ">=3.11"
@@ -23,6 +24,10 @@ dependencies = []
 name = "sudosubin"
 email = "sudosubin@gmail.com"
 
+[project.urls]
+Repository = "https://github.com/sudosubin/tailwindcss-bin"
+Upstream = "https://www.npmjs.com/package/tw-animate-css"
+
 [project.entry-points]
 "tailwindcss_bin.plugins".tw-animate-css = "tailwindcss_bin.plugins.tw_animate_css"
 
@@ -35,6 +40,7 @@ integrity = "sha512-7bziOlRqH0hJx80h/3mbicLW7o8qLsH5+RaLR2t+OHM3D0JlWGODQKQ4cxbK
 [tool.hatch.build]
 targets.wheel.packages = [ "src/tailwindcss_bin" ]
 targets.wheel.hooks.npm-vendor.dependencies = [ "hatch-npm-vendor>=0.1,<0.2" ]
+targets.sdist.exclude = [ "**/node_modules/**" ]
 
 [tool.tailwindcss-bin.plugin]
 npm = "tw-animate-css"

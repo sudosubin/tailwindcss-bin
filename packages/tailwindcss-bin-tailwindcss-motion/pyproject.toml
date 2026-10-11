@@ -6,6 +6,7 @@ requires = [ "hatch-npm-vendor>=0.1,<0.2", "hatchling>=1.27" ]
 name = "tailwindcss-bin-tailwindcss-motion"
 version = "1.1.1.dev1"
 description = "tailwindcss-motion for tailwindcss-bin."
+readme = "README.md"
 license = "MIT"
 license-files = [ "LICENSE", "LICENSE-tailwindcss-motion" ]
 requires-python = ">=3.11"
@@ -23,6 +24,10 @@ dependencies = []
 name = "sudosubin"
 email = "sudosubin@gmail.com"
 
+[project.urls]
+Repository = "https://github.com/sudosubin/tailwindcss-bin"
+Upstream = "https://www.npmjs.com/package/tailwindcss-motion"
+
 [project.entry-points]
 "tailwindcss_bin.plugins".tailwindcss-motion = "tailwindcss_bin.plugins.tailwindcss_motion"
 
@@ -35,6 +40,7 @@ integrity = "sha512-CeeQAc5o31BuEPMyWdq/786X7QWNeifa+8khfu74Fs8lGkgEwjNYv6dGv+lR
 [tool.hatch.build]
 targets.wheel.packages = [ "src/tailwindcss_bin" ]
 targets.wheel.hooks.npm-vendor.dependencies = [ "hatch-npm-vendor>=0.1,<0.2" ]
+targets.sdist.exclude = [ "**/node_modules/**" ]
 
 [tool.tailwindcss-bin.plugin]
 npm = "tailwindcss-motion"
