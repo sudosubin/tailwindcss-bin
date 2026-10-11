@@ -37,7 +37,7 @@ name = "sudosubin"
 email = "sudosubin@gmail.com"
 
 [project.optional-dependencies]
-motion = [ "tailwindcss-bin-tailwindcss-motion" ]
+tailwindcss-motion = [ "tailwindcss-bin-tailwindcss-motion" ]
 tw-animate-css = [ "tailwindcss-bin-tw-animate-css" ]
 
 [project.urls]
@@ -98,7 +98,7 @@ deps = [
   "hatchling>=1.27",
   "packaging",
   "pytest>=8",
-  "tailwindcss-bin[motion,tw-animate-css]",
+  "tailwindcss-bin[tailwindcss-motion,tw-animate-css]",
 ]
 pass_env = [ "TAILWINDCSS_BIN_TARGET" ]
 set_env = { UV_FIND_LINKS = "{toxinidir}/../../.tox/wheelhouse" }

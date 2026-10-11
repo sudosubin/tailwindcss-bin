@@ -108,7 +108,7 @@ version = "4.3.3.dev1"
 source = { editable = "packages/tailwindcss-bin" }
 
 [package.optional-dependencies]
-motion = [
+tailwindcss-motion = [
     { name = "tailwindcss-bin-tailwindcss-motion" },
 ]
 tw-animate-css = [
@@ -123,7 +123,7 @@ tox = [
 
 [package.metadata]
 requires-dist = [
-    { name = "tailwindcss-bin-tailwindcss-motion", marker = "extra == 'motion'", editable = "packages/tailwindcss-bin-tailwindcss-motion" },
+    { name = "tailwindcss-bin-tailwindcss-motion", marker = "extra == 'tailwindcss-motion'", editable = "packages/tailwindcss-bin-tailwindcss-motion" },
     { name = "tailwindcss-bin-tw-animate-css", marker = "extra == 'tw-animate-css'", editable = "packages/tailwindcss-bin-tw-animate-css" },
 ]
 provides-extras = ["tailwindcss-motion", "tw-animate-css"]
