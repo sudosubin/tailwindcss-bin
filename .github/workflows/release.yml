@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
-      checks: read
+      actions: read
     outputs:
       package: ${{ steps.parse.outputs.package }}
       version: ${{ steps.parse.outputs.version }}
@@ -76,11 +76,20 @@ jobs:
 
           git merge-base --is-ancestor HEAD origin/main
           sha=$(git rev-parse HEAD)
-          gh api "repos/$GITHUB_REPOSITORY/commits/$sha/check-runs?check_name=Check&filter=latest&per_page=100" \
-            --jq '[.check_runs[] | select(.name == "Check" and .app.slug == "github-actions")] | max_by(.id) | select(.status == "completed" and .conclusion == "success") | .id' \
-            > "$RUNNER_TEMP/check-runs.txt"
-          if [ ! -s "$RUNNER_TEMP/check-runs.txt" ]; then
-            echo "release commit $sha has no successful CI Check" >&2
+          ci_run=$(gh run list --workflow ci.yml --branch main --event push --commit "$sha" --limit 1 \
+            --json databaseId --jq '.[0].databaseId // empty')
+          checks_passed=false
+          if [ -n "$ci_run" ]; then
+            # The CI release job can still be running when it dispatches this workflow.
+            checks_passed=$(gh run view "$ci_run" --json jobs --jq '
+              [.jobs[] | select(.name == "Lint" or (.name | startswith("Test (") or startswith("Build (")))] |
+              any(.name == "Lint") and
+              any(.name | startswith("Test (")) and
+              any(.name | startswith("Build (")) and
+              all(.status == "completed" and .conclusion == "success")')
+          fi
+          if [ "$checks_passed" != true ]; then
+            echo "release commit $sha has no successful CI lint, test, and build jobs" >&2
             exit 1
           fi
 
