@@ -59,7 +59,10 @@ def _plugin_cases() -> list[tuple[str, str, str]]:
 def test_plugin_upstream_license_matches_npm(pkg_dir, npm_name, license_name):
     package = WORKSPACE_ROOT / "packages" / pkg_dir
     with package.joinpath("pyproject.toml").open("rb") as handle:
-        version = tomllib.load(handle)["project"]["version"]
+        data = tomllib.load(handle)
+    version = data["tool"]["hatch"]["build"]["targets"]["wheel"]["hooks"][
+        "npm-vendor"
+    ]["packages"][0]["version"]
     on_disk = package.joinpath(license_name).read_bytes()
     upstream = npm_license(npm_name, version)
     root_license = (WORKSPACE_ROOT / "LICENSE").read_bytes()

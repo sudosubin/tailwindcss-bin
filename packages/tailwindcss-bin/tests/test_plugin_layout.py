@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from conftest import WORKSPACE_ROOT
+from packaging.version import Version
 
 
 def npm_vendor_dest(module: str, npm: str) -> str:
@@ -36,4 +37,4 @@ def test_plugin_pyproject_conventions(package_dir: Path):
     ]["packages"][0]
     assert vendor["dest"] == npm_vendor_dest(module, npm)
     assert vendor["package"] == npm
-    assert vendor["version"] == project_version
+    assert vendor["version"] == Version(project_version).base_version
