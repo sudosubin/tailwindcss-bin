@@ -3,17 +3,13 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import sys
 import tarfile
+import tomllib
 import urllib.request
 from io import BytesIO
 
 import pytest
-import tomllib
 from conftest import WORKSPACE_ROOT
-
-if sys.version_info < (3, 11):
-    pytest.skip("tomllib required", allow_module_level=True)
 
 
 def npm_license(package: str, version: str) -> bytes:

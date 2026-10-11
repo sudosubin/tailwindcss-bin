@@ -73,7 +73,7 @@ archs = [ "x86_64", "arm64" ]
 
 [tool.pytest.ini_options]
 testpaths = [ "tests" ]
-pythonpath = [ "src" ]
+pythonpath = [ ".", "src" ]
 
 [tool.tox]
 requires = [ "tox==4.65.1", "tox-uv==1.28.1" ]

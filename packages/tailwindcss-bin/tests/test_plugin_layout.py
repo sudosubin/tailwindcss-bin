@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-import sys
+import tomllib
 from pathlib import Path
 
 import pytest
-import tomllib
 from conftest import WORKSPACE_ROOT
-
-if sys.version_info < (3, 11):
-    pytest.skip("tomllib required", allow_module_level=True)
 
 
 def npm_vendor_dest(module: str, npm: str) -> str:
