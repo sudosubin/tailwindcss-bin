@@ -6,8 +6,13 @@ on:
   workflow_dispatch:
     inputs:
       package:
-        description: Package to update (defaults to tailwindcss-bin)
-        required: false
+        description: Package to update
+        type: choice
+        default: tailwindcss-bin
+        options:
+          - tailwindcss-bin
+          - tailwindcss-bin-tailwindcss-motion
+          - tailwindcss-bin-tw-animate-css
       version:
         description: Upstream version (defaults to latest)
         required: false
@@ -20,10 +25,6 @@ permissions: {}
 jobs:
   update:
     name: Update (${{ matrix.package }})
-    if: >-
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.package == '' ||
-      github.event.inputs.package == matrix.package
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: write
@@ -47,7 +48,9 @@ jobs:
 
       - name: plan core update
         id: plan-core
-        if: matrix.package == 'tailwindcss-bin'
+        if: >-
+          matrix.package == 'tailwindcss-bin' &&
+          (github.event_name == 'schedule' || inputs.package == matrix.package)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -68,7 +71,9 @@ jobs:
 
       - name: plan plugin update
         id: plan-plugin
-        if: matrix.package != 'tailwindcss-bin'
+        if: >-
+          matrix.package != 'tailwindcss-bin' &&
+          (github.event_name == 'schedule' || inputs.package == matrix.package)
         run: |
           set -euo pipefail
           npm=$(yq -p=toml -oy '.tool."tailwindcss-bin".plugin.npm' "$PKG_DIR/pyproject.toml")
