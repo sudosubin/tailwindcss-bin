@@ -168,8 +168,7 @@ jobs:
                   with zipfile.ZipFile(wheel) as archive:
                       archive.extractall(staging)
               binary, = staging.glob("*.data/scripts/tailwindcss-bin")
-              binary.chmod(0o755)
-              (staging / "binary-path").write_text(str(binary.relative_to(staging)))
+              binary.rename(staging / "tailwindcss-bin").chmod(0o755)
           PY
 
       - name: test plugins and native watch on glibc 2.24 and musl
@@ -180,12 +179,11 @@ jobs:
           node_path=/wheels/tailwindcss_bin/plugins/tailwindcss_motion/node_modules:/wheels/tailwindcss_bin/plugins/tw_animate_css/node_modules
           for runtime in glibc musl; do
             if [ "$runtime" = glibc ]; then image=debian:stretch-slim; else image=alpine:3.24; fi
-            binary=$(cat "$STAGING/$runtime/binary-path")
             docker run --rm -i -v "$STAGING/$runtime:/wheels:ro" \
-              -e "NODE_PATH=$node_path" "$image" sh -s -- "/wheels/$binary" <<'SH'
+              -e "NODE_PATH=$node_path" "$image" sh -s <<'SH'
           set -eu
           if [ -f /etc/alpine-release ]; then apk add --no-cache libstdc++ libgcc; fi
-          binary=$1
+          binary=/wheels/tailwindcss-bin
           smoke_dir=$(mktemp -d)
           watch_pid=
           cleanup() {
