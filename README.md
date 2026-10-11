@@ -1,20 +1,45 @@
 # tailwindcss-bin
 
-Monorepo of Python wheels for the [Tailwind CSS](https://tailwindcss.com)
-standalone CLI and optional plugins.
+The [Tailwind CSS](https://tailwindcss.com) standalone CLI and optional plugins,
+packaged as Python wheels. Python 3.11 or newer is required; Node.js and npm are
+not needed to run the bundled CLI.
 
-| Package | PyPI name |
+```sh
+uv add --dev 'tailwindcss-bin[tailwindcss-motion,tw-animate-css]'
+uv run tailwindcss -i input.css -o output.css --minify
+```
+
+```css
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "tailwindcss-motion";
+```
+
+| Package | Bundled software |
 | --- | --- |
-| Core CLI | `tailwindcss-bin` |
-| Plugins | `tailwindcss-bin-tailwindcss-motion`, `tailwindcss-bin-tw-animate-css` |
+| `tailwindcss-bin` | Tailwind CSS standalone CLI |
+| `tailwindcss-bin-tailwindcss-motion` | `tailwindcss-motion` |
+| `tailwindcss-bin-tw-animate-css` | `tw-animate-css` |
 
-Optional extras on the core package: `tailwindcss-motion`, `tw-animate-css`.
+The Python version follows the bundled upstream version. Development builds use
+`.devN`; packaging-only corrections use `.postN`. Pin a development version
+explicitly when testing it, for example `tailwindcss-bin==4.3.3.dev1`.
 
-## Releases
+## Platforms
 
-Push a tag that matches `project.version` in the package directory:
+| Platform | Architectures | Requirements |
+| --- | --- | --- |
+| Linux, glibc | x86_64, aarch64 | glibc 2.24 or newer with a compatible system `libstdc++` |
+| Linux, musl | x86_64, aarch64 | musl 1.2; Alpine needs `libstdc++` and `libgcc` |
+| macOS | x86_64, arm64 | Minimum OS version is recorded in each wheel tag |
+| Windows | x86_64 | 64-bit Windows |
 
-- `tailwindcss-bin@v4.3.3.dev1` — core (cibuildwheel)
-- `tailwindcss-bin-tw-animate-css@v1.4.0.dev1` — plugin (`uv build`)
+See the [CLI package README](packages/tailwindcss-bin/README.md) for command and
+Python API usage.
 
-See `.github/workflows/release.yml`.
+## Development and releases
+
+[CONTRIBUTING.md](CONTRIBUTING.md) describes local checks and versioning.
+Upstream updates open pull requests; successful CI on `main` publishes new
+stable or post-release versions. Maintainers review and merge changes before
+publication.

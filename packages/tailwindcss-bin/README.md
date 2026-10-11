@@ -1,13 +1,14 @@
 # tailwindcss-bin
 
 The [Tailwind CSS](https://tailwindcss.com) standalone CLI, packaged as Python wheels.
+Requires Python 3.11 or newer. The bundled CLI runs without Node.js or npm.
 
 ## Usage
 
 ```sh
 uv add --dev tailwindcss-bin
 uv run tailwindcss -i input.css -o output.css --minify
-# `tailwindcss` applies plugin NODE_PATH; `python -m tailwindcss_bin` is equivalent
+uv run tailwindcss -i input.css -o output.css --watch
 ```
 
 Optional plugins:
@@ -22,25 +23,52 @@ uv add --dev 'tailwindcss-bin[tailwindcss-motion,tw-animate-css]'
 @plugin "tailwindcss-motion";
 ```
 
-```python
-from tailwindcss_bin import find_tailwindcss_bin
+Both `tailwindcss` and `python -m tailwindcss_bin` configure `NODE_PATH` for
+installed plugin wheels. Run commands from the directory containing your CSS
+and templates, or use the Tailwind CLI's `--cwd` option.
+
+For pip:
+
+```sh
+python -m pip install 'tailwindcss-bin[tailwindcss-motion,tw-animate-css]'
+python -m tailwindcss_bin -i input.css -o output.css --minify
 ```
 
-The package version matches the bundled Tailwind CSS version.
+The package version follows the bundled Tailwind CSS version. Development
+versions such as `4.3.3.dev1` require an explicit version pin or your installer's
+pre-release option. A `.postN` suffix identifies a packaging-only correction.
+
+## Python API
+
+```python
+import subprocess
+
+from tailwindcss_bin import apply_node_path, find_tailwindcss_bin
+
+apply_node_path()
+subprocess.run([find_tailwindcss_bin(), "-i", "input.css"], check=True)
+```
+
+`find_tailwindcss_bin()` returns the installed binary's path. `apply_node_path()`
+adds installed plugin directories to the current process environment for child
+processes. It preserves existing `NODE_PATH` entries.
 
 ## Supported platforms
 
-| Platform | Architectures |
-| --- | --- |
-| Linux (glibc) | x86_64, aarch64 |
-| Linux (musl) | x86_64, aarch64 |
-| macOS | x86_64, arm64 |
-| Windows | x86_64 |
+| Platform | Architectures | Requirements |
+| --- | --- | --- |
+| Linux (glibc) | x86_64, aarch64 | glibc 2.24 or newer; compatible `libstdc++` |
+| Linux (musl) | x86_64, aarch64 | musl 1.2; `libstdc++` and `libgcc` |
+| macOS | x86_64, arm64 | Minimum version is recorded in each wheel tag |
+| Windows | x86_64 | 64-bit Windows |
 
-The minimum glibc and macOS versions in the wheel tags are read from each
-binary. On Alpine, install `libstdc++` and `libgcc`.
+The Linux wheel tags account for both glibc and the executable's embedded C++
+libraries. Native file watching currently needs `GLIBCXX_3.4.22` and
+`CXXABI_1.3.9`. CI checks minification, both plugins, and native watch rebuilds on
+glibc 2.24 and musl.
 
-## License
+On Alpine:
 
-This wheel lists `LICENSE` (symlink to the repo root) and `LICENSE-tailwindcss`
-(synced with the pinned Tailwind release) in `license-files`.
+```sh
+apk add --no-cache libstdc++ libgcc
+```
