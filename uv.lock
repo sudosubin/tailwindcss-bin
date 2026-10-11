@@ -790,7 +790,7 @@ source = { editable = "packages/tailwindcss-bin-tailwindcss-motion" }
 
 [[package]]
 name = "tailwindcss-bin-tw-animate-css"
-version = "1.4.0.dev1"
+version = "1.4.0"
 source = { editable = "packages/tailwindcss-bin-tw-animate-css" }
 
 [[package]]
