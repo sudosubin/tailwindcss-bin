@@ -15,17 +15,11 @@ Run without adding a project dependency:
 uvx tailwindcss-bin -i input.css -o output.css --minify
 ```
 
-```css
-@import "tailwindcss";
-@import "tw-animate-css";
-@plugin "tailwindcss-motion";
-```
-
 | Package | Bundled software |
 | --- | --- |
-| `tailwindcss-bin` | Tailwind CSS standalone CLI |
-| `tailwindcss-bin-tailwindcss-motion` | `tailwindcss-motion` |
-| `tailwindcss-bin-tw-animate-css` | `tw-animate-css` |
+| [tailwindcss-bin](packages/tailwindcss-bin/) | Tailwind CSS standalone CLI |
+| [tailwindcss-bin-tailwindcss-motion](packages/tailwindcss-bin-tailwindcss-motion/) | `tailwindcss-motion` |
+| [tailwindcss-bin-tw-animate-css](packages/tailwindcss-bin-tw-animate-css/) | `tw-animate-css` |
 
 The Python version follows the bundled upstream version. Development builds use
 `.devN`; packaging-only corrections use `.postN`. Pin a development version
