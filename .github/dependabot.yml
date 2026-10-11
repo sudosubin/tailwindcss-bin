@@ -1,0 +1,23 @@
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    assignees:
+      - sudosubin
+    allow:
+      - dependency-type: all
+    groups:
+      python-tools:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    assignees:
+      - sudosubin
+    groups:
+      github-actions:
+        patterns: ["*"]
