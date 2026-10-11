@@ -282,13 +282,12 @@ jobs:
             esac
             tag_sha=$(git rev-parse "$tag^{commit}")
             state=$(gh run list --workflow release.yml --commit "$tag_sha" --limit 100 \
-              --json databaseId,displayTitle,headSha,status,conclusion | \
-              jq -r --arg title "Release $tag" --arg sha "$tag_sha" '
-                [.[] | select(.displayTitle == $title and .headSha == $sha)] | max_by(.databaseId) |
+              --json databaseId,displayTitle,status,conclusion | \
+              jq -r --arg title "Release $tag" '
+                [.[] | select(.displayTitle == $title)] | max_by(.databaseId) |
                 if . == null then "missing"
                 elif .status != "completed" then "running"
-                elif .conclusion == "success" then "success"
-                else "retry" end')
+                else .conclusion end')
             if [ "$state" = running ] || { [ "$status" = 200 ] && [ "$state" = success ]; }; then
               continue
             fi
