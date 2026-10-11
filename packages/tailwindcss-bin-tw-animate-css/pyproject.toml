@@ -39,7 +39,6 @@ integrity = "sha512-7bziOlRqH0hJx80h/3mbicLW7o8qLsH5+RaLR2t+OHM3D0JlWGODQKQ4cxbK
 
 [tool.hatch.build]
 targets.wheel.packages = [ "src/tailwindcss_bin" ]
-targets.wheel.hooks.npm-vendor.dependencies = [ "hatch-npm-vendor>=0.1,<0.2" ]
 targets.sdist.exclude = [ "**/node_modules/**" ]
 
 [tool.tailwindcss-bin.plugin]
