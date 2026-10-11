@@ -96,20 +96,17 @@ jobs:
           VERSION: ${{ steps.plan-core.outputs.version }}
         run: |
           set -euo pipefail
-          repo=tailwindlabs/tailwindcss
-          gh release view "v$VERSION" --repo "$repo" --json assets --jq '
-            .assets[] | select(.name | startswith("tailwindcss-"))
-            | "\(.name[11:] | rtrimstr(".exe")) = \"\(
-                .digest // error("\(.name) has no digest") | .[7:]
-              )\""' > "$RUNNER_TEMP/pins"
-          curl -fsSL "https://raw.githubusercontent.com/$repo/v$VERSION/LICENSE" \
+          gh release view "v$VERSION" --repo tailwindlabs/tailwindcss --json assets --jq '
+            [.assets[]
+              | select(.name | startswith("tailwindcss-"))
+              | {(.name[11:] | rtrimstr(".exe")): (.digest // error("\(.name) has no digest") | .[7:])}
+            ] | add' > "$RUNNER_TEMP/pins.json"
+          curl -fsSL "https://raw.githubusercontent.com/tailwindlabs/tailwindcss/v$VERSION/LICENSE" \
             -o "$PKG_DIR/LICENSE-tailwindcss"
-          yq -i -p=toml -o=toml ".project.version = \"$VERSION\"" "$PKG_DIR/pyproject.toml"
-          awk -v pins="$RUNNER_TEMP/pins" '
-            /^\[tool\.tailwindcss-bin\.sha256\]/ { print; while ((getline l < pins) > 0) print l; close(pins); skip=1; next }
-            skip && /^\[/ { skip=0 } skip { next } { print }
-          ' "$PKG_DIR/pyproject.toml" > "$PKG_DIR/pyproject.toml.tmp"
-          mv "$PKG_DIR/pyproject.toml.tmp" "$PKG_DIR/pyproject.toml"
+          yq -i -p=toml -o=toml \
+            ".project.version = \"$VERSION\" |
+             .tool.\"tailwindcss-bin\".sha256 = load(\"$RUNNER_TEMP/pins.json\")" \
+            "$PKG_DIR/pyproject.toml"
 
       - name: apply plugin update
         if: matrix.package != 'tailwindcss-bin' && steps.plan-plugin.outputs.changed == 'true'
