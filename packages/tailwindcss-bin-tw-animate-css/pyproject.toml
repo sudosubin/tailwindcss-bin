@@ -8,12 +8,9 @@ version = "1.4.0.dev1"
 description = "tw-animate-css for tailwindcss-bin."
 license = "MIT"
 license-files = [ "LICENSE", "LICENSE-tw-animate-css" ]
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",

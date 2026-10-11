@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 import os
-import sys
 from importlib.metadata import entry_points
 from pathlib import Path
 
 
 def node_module_paths() -> list[str]:
     paths = []
-    if sys.version_info >= (3, 10):
-        plugins = entry_points(group="tailwindcss_bin.plugins")
-    else:
-        plugins = entry_points().get("tailwindcss_bin.plugins", [])
+    plugins = entry_points(group="tailwindcss_bin.plugins")
     for ep in plugins:
         mod = ep.load()
         if mod.__file__ is None:
