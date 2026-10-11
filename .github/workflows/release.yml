@@ -1,10 +1,12 @@
 name: Release
+run-name: Release ${{ github.ref_name }}
 
 on:
   push:
     tags:
       - "tailwindcss-bin@v*"
       - "tailwindcss-bin-*@v*"
+  workflow_dispatch:
 
 concurrency:
   group: release-${{ github.ref }}
@@ -18,32 +20,67 @@ jobs:
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
+      checks: read
     outputs:
       package: ${{ steps.parse.outputs.package }}
       version: ${{ steps.parse.outputs.version }}
       method: ${{ steps.parse.outputs.method }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version-file: uv.lock
+          python-version: "3.14"
 
       - id: parse
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          if [ "$GITHUB_REF_TYPE" != tag ]; then
+            echo "release must run from a tag" >&2
+            exit 1
+          fi
           tag="${GITHUB_REF_NAME}"
           package="${tag%%@*}"
           version="${tag#*@}"
           version="${version#v}"
 
-          if [[ ! "$package" =~ ^tailwindcss-bin(-|$) ]]; then
-            echo "unsupported package name: $package" >&2
+          case "$package" in
+            tailwindcss-bin|tailwindcss-bin-tailwindcss-motion|tailwindcss-bin-tw-animate-css) ;;
+            *) echo "unsupported package name: $package" >&2; exit 1 ;;
+          esac
+          if [ "$tag" != "$package@v$version" ]; then
+            echo "invalid release tag: $tag" >&2
             exit 1
           fi
+
+          uv run --frozen --only-group build python - "$version" <<'PY'
+          import sys
+          from packaging.version import Version
+
+          version = Version(sys.argv[1])
+          if version.epoch or version.local:
+              sys.exit("release version must not contain an epoch or a local version")
+          PY
 
           expected=$(uv version --package "$package" --short)
           if [ "$expected" != "$version" ]; then
             echo "tag version $version does not match pyproject version $expected" >&2
+            exit 1
+          fi
+
+          git merge-base --is-ancestor HEAD origin/main
+          sha=$(git rev-parse HEAD)
+          gh api "repos/$GITHUB_REPOSITORY/commits/$sha/check-runs?check_name=Check&filter=latest&per_page=100" \
+            --jq '[.check_runs[] | select(.name == "Check" and .app.slug == "github-actions")] | max_by(.id) | select(.status == "completed" and .conclusion == "success") | .id' \
+            > "$RUNNER_TEMP/check-runs.txt"
+          if [ ! -s "$RUNNER_TEMP/check-runs.txt" ]; then
+            echo "release commit $sha has no successful CI Check" >&2
             exit 1
           fi
 
@@ -72,23 +109,53 @@ jobs:
         runner: [ubuntu-24.04, ubuntu-24.04-arm, macos-latest, windows-latest]
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: pypa/cibuildwheel@adba99c781d3746d38b3a09b1cf797965bcb7fe6 # v4.3.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version-file: uv.lock
+          python-version: "3.14"
+
+      - name: export build constraints
+        shell: bash
+        run: |
+          mkdir -p .tox
+          uv export --frozen --only-group build --no-emit-project -o .tox/build-constraints.txt
+          uv export --frozen --only-group test --no-emit-project -o .tox/test-requirements.txt
+
+      - name: build plugin wheels for platform tests
+        shell: bash
+        run: |
+          uv build --wheel --package tailwindcss-bin-tailwindcss-motion --out-dir .tox/plugin-wheelhouse --build-constraint .tox/build-constraints.txt --require-hashes
+          uv build --wheel --package tailwindcss-bin-tw-animate-css --out-dir .tox/plugin-wheelhouse --build-constraint .tox/build-constraints.txt --require-hashes
+
+      - uses: pypa/cibuildwheel@b3395e271a35f73dad77f21802abe9b986dfe299 # v4.3.1
         with:
           package-dir: packages/${{ needs.resolve.outputs.package }}
           extras: uv
 
+      - name: build and validate the source distribution
+        if: matrix.runner == 'ubuntu-24.04-arm'
+        env:
+          PACKAGE: ${{ needs.resolve.outputs.package }}
+        run: |
+          uv build --sdist --package "$PACKAGE" --build-constraint .tox/build-constraints.txt --require-hashes
+          uv run --frozen --only-group audit twine check --strict dist/*.tar.gz
+
       - name: stage cibuildwheel artifacts
         shell: bash
+        env:
+          BUILD_RUNNER: ${{ matrix.runner }}
         run: |
+          uv run --frozen --only-group audit twine check --strict wheelhouse/*.whl
           mkdir -p upload
           cp wheelhouse/*.whl upload/
+          if [ "$BUILD_RUNNER" = ubuntu-24.04-arm ]; then cp dist/*.tar.gz upload/; fi
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wheels-${{ matrix.runner }}
-          path: upload/*.whl
+          path: upload/*
           if-no-files-found: error
 
   build-uv:
@@ -100,20 +167,31 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version-file: uv.lock
+          python-version: "3.14"
+
+      - name: export build constraints
+        run: |
+          mkdir -p .tox
+          uv export --frozen --only-group build --no-emit-project -o .tox/build-constraints.txt
 
       - name: build the wheel
+        env:
+          PACKAGE: ${{ needs.resolve.outputs.package }}
         run: |
-          uv build --wheel --package "${{ needs.resolve.outputs.package }}"
+          uv build --sdist --wheel --package "$PACKAGE" --build-constraint .tox/build-constraints.txt --require-hashes
+          uv run --frozen --only-group audit twine check --strict dist/*
           mkdir -p upload
-          cp dist/*.whl upload/
+          cp dist/* upload/
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wheels
-          path: upload/*.whl
+          path: upload/*
           if-no-files-found: error
 
   publish:
@@ -130,10 +208,12 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: wheels*
           path: dist
           merge-multiple: true
 
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          skip-existing: true
