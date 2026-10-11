@@ -14,7 +14,6 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 from packaging.version import Version
 
 CACHE = Path(__file__).parent / ".cache"
-REPO = "tailwindlabs/tailwindcss"
 TARGETS = {
     "linux-arm64": "manylinux_{}_{}_aarch64",
     "linux-arm64-musl": "musllinux_1_2_aarch64",
@@ -53,7 +52,7 @@ def fetch(release: str, target: str, sha256: str) -> Path:
     exe = ".exe" if target.startswith("windows") else ""
     path = CACHE / f"v{release}" / f"tailwindcss-{target}{exe}"
     if not path.is_file():
-        url = f"https://github.com/{REPO}/releases/download/v{release}"
+        url = f"https://github.com/tailwindlabs/tailwindcss/releases/download/v{release}"
         data = _github_get(f"{url}/{path.name}")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
@@ -62,8 +61,8 @@ def fetch(release: str, target: str, sha256: str) -> Path:
         path.unlink()
         raise RuntimeError(
             f"{path.name} does not match the pinned sha256; verify and pin "
-            f"the digests from `gh release view v{release} --repo {REPO} "
-            f"--json assets`"
+            f"the digests from `gh release view v{release} --repo "
+            f"tailwindlabs/tailwindcss --json assets`"
         )
     path.chmod(0o755)
     return path
