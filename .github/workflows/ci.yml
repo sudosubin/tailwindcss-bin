@@ -97,7 +97,6 @@ jobs:
       - name: export build constraints
         shell: bash
         run: |
-          mkdir -p .tox
           uv export --frozen --only-group build --no-emit-project -o .tox/build-constraints.txt
           uv export --frozen --only-group test --no-emit-project -o .tox/test-requirements.txt
 
@@ -140,45 +139,30 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version-file: uv.lock
-          python-version: "3.14"
 
-      - name: tag and dispatch unpublished versions
+      - name: tag and dispatch releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          uv run --frozen --only-group build python - <<'PY' > "$RUNNER_TEMP/release-versions.txt"
-          import tomllib
-          from pathlib import Path
-          from packaging.version import Version
-
-          for path in sorted(Path("packages").glob("*/pyproject.toml")):
-              project = tomllib.loads(path.read_text())["project"]
-              version = Version(project["version"])
-              if not (version.is_prerelease or version.is_devrelease or version.epoch or version.local):
-                  print(project["name"], project["version"])
-          PY
-          while read -r package version; do
+          packages=$(uv workspace list)
+          for package in $packages; do
+            version=$(uv version --package "$package" --short)
+            [[ "$version" =~ ^[0-9]+(\.[0-9]+)*(\.post[0-9]+)?$ ]] || continue
             tag="$package@v$version"
             if ! git show-ref --verify --quiet "refs/tags/$tag"; then
               git tag "$tag" "$GITHUB_SHA"
               git push origin "refs/tags/$tag"
             fi
-            status=$(curl -sS --retry 3 -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/$package/$version/json")
-            case "$status" in
-              200|404) ;;
-              *) echo "PyPI returned HTTP $status for $package $version" >&2; exit 1 ;;
-            esac
             tag_sha=$(git rev-parse "$tag^{commit}")
-            state=$(gh run list --workflow release.yml --commit "$tag_sha" --limit 100 \
-              --json databaseId,displayTitle,status,conclusion | \
-              jq -r --arg title "Release $tag" '
-                [.[] | select(.displayTitle == $title)] | max_by(.databaseId) |
+            state=$(TAG="$tag" gh run list --workflow release.yml --commit "$tag_sha" --limit 100 \
+              --json databaseId,displayTitle,status,conclusion --jq '
+                [.[] | select(.displayTitle == "Release " + env.TAG)] | max_by(.databaseId) |
                 if . == null then "missing"
                 elif .status != "completed" then "running"
                 else .conclusion end')
-            if [ "$state" = running ] || { [ "$status" = 200 ] && [ "$state" = success ]; }; then
-              continue
-            fi
+            case "$state" in
+              running|success) continue ;;
+            esac
             gh workflow run release.yml --ref "$tag"
-          done < "$RUNNER_TEMP/release-versions.txt"
+          done

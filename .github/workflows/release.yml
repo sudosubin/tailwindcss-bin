@@ -128,7 +128,6 @@ jobs:
       - name: export build constraints
         shell: bash
         run: |
-          mkdir -p .tox
           uv export --frozen --only-group build --no-emit-project -o .tox/build-constraints.txt
           uv export --frozen --only-group test --no-emit-project -o .tox/test-requirements.txt
 
@@ -176,9 +175,7 @@ jobs:
           python-version: "3.14"
 
       - name: export build constraints
-        run: |
-          mkdir -p .tox
-          uv export --frozen --only-group build --no-emit-project -o .tox/build-constraints.txt
+        run: uv export --frozen --only-group build --no-emit-project -o .tox/build-constraints.txt
 
       - name: build the wheel
         env:
