@@ -4,7 +4,7 @@ requires = [ "hatch-npm-vendor>=0.1,<0.2", "hatchling>=1.27" ]
 
 [project]
 name = "tailwindcss-bin-tailwindcss-motion"
-version = "1.1.1.dev1"
+version = "1.1.1"
 description = "tailwindcss-motion for tailwindcss-bin."
 readme = "README.md"
 license = "MIT"
