@@ -20,132 +20,152 @@ permissions: {}
 jobs:
   update:
     name: Update (${{ matrix.package }})
+    if: >-
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.package == '' ||
+      github.event.inputs.package == matrix.package
     runs-on: ubuntu-24.04-arm
     permissions:
       contents: write
       pull-requests: write
     strategy:
+      fail-fast: false
       matrix:
         package:
           - tailwindcss-bin
           - tailwindcss-bin-tailwindcss-motion
           - tailwindcss-bin-tw-animate-css
     env:
-      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ github.event.inputs.version }}
 
     steps:
       - uses: actions/checkout@v7
 
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
 
-      - name: update the package
-        id: update
+      - name: plan core update
+        id: plan-core
+        if: matrix.package == 'tailwindcss-bin'
         env:
-          PACKAGE: ${{ inputs.package || matrix.package }}
-          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          set_sha256_pins() {
-            local file=$1 pins_file=$2
-            awk -v pins="$pins_file" '
-              /^\[tool\.tailwindcss-bin\.sha256\]/ {
-                print
-                while ((getline line < pins) > 0) print line
-                close(pins)
-                skip=1
-                next
-              }
-              skip && /^\[/ { skip=0 }
-              skip { next }
-              { print }
-            ' "$file" > "${file}.tmp"
-            mv "${file}.tmp" "$file"
-          }
-
-          fetch_npm_license() {
-            local npm=$1 version=$2 dest=$3
-            local tarball
-            tarball=$(curl -fsSL "https://registry.npmjs.org/$npm/$version" | jq -r .dist.tarball)
-            curl -fsSL "$tarball" | tar -xzf - -O package/LICENSE > "$dest"
-          }
-
-          if [ -n "${{ inputs.package }}" ] && [ "${{ inputs.package }}" != "$PACKAGE" ]; then
-            echo "skip"
+          set -euo pipefail
+          repo=tailwindlabs/tailwindcss
+          dir=packages/tailwindcss-bin
+          version=${VERSION#v}
+          if [ -z "$version" ]; then
+            version=$(gh release view --repo "$repo" --json tagName --jq '.tagName[1:]')
+          fi
+          branch="update/tailwindcss-bin-v$version"
+          current=$(uv version --package tailwindcss-bin --short)
+          if [ "$current" = "$version" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          dir="packages/$PACKAGE"
-          case "$PACKAGE" in
-            tailwindcss-bin)
-              repo=tailwindlabs/tailwindcss
-              version=${VERSION#v}
-              if [ -z "$version" ]; then
-                version=$(gh release view --repo "$repo" --json tagName --jq '.tagName[1:]')
-              fi
-              branch="update/$PACKAGE-v$version"
-              current=$(yq -p=toml -oy '.project.version' "$dir/pyproject.toml")
-              if [ "$current" = "$version" ]; then
-                exit 0
-              fi
-              if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
-                exit 0
-              fi
-              gh release view "v$version" --repo "$repo" --json assets --jq '
-                .assets[] | select(.name | startswith("tailwindcss-"))
-                | "\(.name[11:] | rtrimstr(".exe")) = \"\(
-                    .digest // error("\(.name) has no digest") | .[7:]
-                  )\""
-              ' > "$RUNNER_TEMP/pins"
-              license_file=LICENSE-tailwindcss
-              curl -fsSL "https://raw.githubusercontent.com/$repo/v$version/LICENSE" \
-                -o "$dir/$license_file"
-              yq -i -p=toml -o=toml ".project.version = \"$version\"" "$dir/pyproject.toml"
-              set_sha256_pins "$dir/pyproject.toml" "$RUNNER_TEMP/pins"
-              body="https://github.com/$repo/releases/tag/v$version"
-              ;;
-            *)
-              npm=$(yq -p=toml -oy '.tool."tailwindcss-bin".plugin.npm' "$dir/pyproject.toml")
-              license_file=$(yq -p=toml -oy '.tool."tailwindcss-bin".plugin.upstream-license' "$dir/pyproject.toml")
-              version=${VERSION#v}
-              if [ -z "$version" ]; then
-                version=$(curl -fsSL "https://registry.npmjs.org/$npm/latest" | jq -r .version)
-              fi
-              branch="update/$PACKAGE-v$version"
-              current=$(yq -p=toml -oy '.project.version' "$dir/pyproject.toml")
-              if [ "$current" = "$version" ]; then
-                exit 0
-              fi
-              if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
-                exit 0
-              fi
-              integrity=$(curl -fsSL "https://registry.npmjs.org/$npm/$version" | jq -r .dist.integrity)
-              fetch_npm_license "$npm" "$version" "$dir/$license_file"
-              yq -i -p=toml -o=toml \
-                ".project.version = \"$version\" |
-                 .tool.hatch.build.targets.wheel.hooks.\"npm-vendor\".packages[0].version = \"$version\" |
-                 .tool.hatch.build.targets.wheel.hooks.\"npm-vendor\".packages[0].integrity = \"$integrity\"" \
-                "$dir/pyproject.toml"
-              body="https://www.npmjs.com/package/$npm/v/$version"
-              ;;
-          esac
-          uv lock
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "branch=$branch" >> "$GITHUB_OUTPUT"
-          echo "package=$PACKAGE" >> "$GITHUB_OUTPUT"
-          echo "body=$body" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          {
+            echo "changed=true"
+            echo "version=$version"
+            echo "branch=$branch"
+            echo "body=https://github.com/$repo/releases/tag/v$version"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: open a pull request
-        if: steps.update.outputs.version
+      - name: apply core update
+        if: matrix.package == 'tailwindcss-bin' && steps.plan-core.outputs.changed == 'true'
         env:
-          PACKAGE: ${{ steps.update.outputs.package }}
-          VERSION: ${{ steps.update.outputs.version }}
-          BRANCH: ${{ steps.update.outputs.branch }}
-          BODY: ${{ steps.update.outputs.body }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.plan-core.outputs.version }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
-          git switch -c "$BRANCH"
-          git add -A
-          git commit -m "Update $PACKAGE to v$VERSION"
-          git push origin "$BRANCH"
-          gh pr create --head "$BRANCH" \
-            --title "Update $PACKAGE to v$VERSION" \
-            --body "$BODY"
+          set -euo pipefail
+          repo=tailwindlabs/tailwindcss
+          dir=packages/tailwindcss-bin
+          gh release view "v$VERSION" --repo "$repo" --json assets --jq '
+            .assets[] | select(.name | startswith("tailwindcss-"))
+            | "\(.name[11:] | rtrimstr(".exe")) = \"\(
+                .digest // error("\(.name) has no digest") | .[7:]
+              )\""
+          ' > "$RUNNER_TEMP/pins"
+          curl -fsSL "https://raw.githubusercontent.com/$repo/v$VERSION/LICENSE" \
+            -o "$dir/LICENSE-tailwindcss"
+          yq -i -p=toml -o=toml ".project.version = \"$VERSION\"" "$dir/pyproject.toml"
+          awk -v pins="$RUNNER_TEMP/pins" '
+            /^\[tool\.tailwindcss-bin\.sha256\]/ {
+              print
+              while ((getline line < pins) > 0) print line
+              close(pins)
+              skip=1
+              next
+            }
+            skip && /^\[/ { skip=0 }
+            skip { next }
+            { print }
+          ' "$dir/pyproject.toml" > "$dir/pyproject.toml.tmp"
+          mv "$dir/pyproject.toml.tmp" "$dir/pyproject.toml"
+
+      - name: plan plugin update
+        id: plan-plugin
+        if: matrix.package != 'tailwindcss-bin'
+        run: |
+          set -euo pipefail
+          dir="packages/${{ matrix.package }}"
+          npm=$(yq -p=toml -oy '.tool."tailwindcss-bin".plugin.npm' "$dir/pyproject.toml")
+          version=${VERSION#v}
+          if [ -z "$version" ]; then
+            version=$(curl -fsSL "https://registry.npmjs.org/$npm/latest" | jq -r .version)
+          fi
+          branch="update/${{ matrix.package }}-v$version"
+          current=$(uv version --package "${{ matrix.package }}" --short)
+          if [ "$current" = "$version" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          {
+            echo "changed=true"
+            echo "version=$version"
+            echo "branch=$branch"
+            echo "body=https://www.npmjs.com/package/$npm/v/$version"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: apply plugin update
+        if: matrix.package != 'tailwindcss-bin' && steps.plan-plugin.outputs.changed == 'true'
+        env:
+          VERSION: ${{ steps.plan-plugin.outputs.version }}
+        run: |
+          set -euo pipefail
+          dir="packages/${{ matrix.package }}"
+          npm=$(yq -p=toml -oy '.tool."tailwindcss-bin".plugin.npm' "$dir/pyproject.toml")
+          license_file=$(yq -p=toml -oy '.tool."tailwindcss-bin".plugin.upstream-license' "$dir/pyproject.toml")
+          integrity=$(curl -fsSL "https://registry.npmjs.org/$npm/$VERSION" | jq -r .dist.integrity)
+          tarball=$(curl -fsSL "https://registry.npmjs.org/$npm/$VERSION" | jq -r .dist.tarball)
+          curl -fsSL "$tarball" | tar -xzf - -O package/LICENSE > "$dir/$license_file"
+          yq -i -p=toml -o=toml \
+            ".project.version = \"$VERSION\" |
+             .tool.hatch.build.targets.wheel.hooks.\"npm-vendor\".packages[0].version = \"$VERSION\" |
+             .tool.hatch.build.targets.wheel.hooks.\"npm-vendor\".packages[0].integrity = \"$integrity\"" \
+            "$dir/pyproject.toml"
+
+      - name: lock the workspace
+        if: >-
+          steps.plan-core.outputs.changed == 'true' ||
+          steps.plan-plugin.outputs.changed == 'true'
+        run: uv lock
+
+      - uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
+        if: >-
+          steps.plan-core.outputs.changed == 'true' ||
+          steps.plan-plugin.outputs.changed == 'true'
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ steps.plan-core.outputs.branch || steps.plan-plugin.outputs.branch }}
+          commit-message: >-
+            Update ${{ matrix.package }} to v${{ steps.plan-core.outputs.version || steps.plan-plugin.outputs.version }}
+          title: >-
+            Update ${{ matrix.package }} to v${{ steps.plan-core.outputs.version || steps.plan-plugin.outputs.version }}
+          body: ${{ steps.plan-core.outputs.body || steps.plan-plugin.outputs.body }}
