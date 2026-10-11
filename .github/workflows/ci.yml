@@ -124,20 +124,6 @@ jobs:
         shell: bash
         run: uv run --frozen --only-group audit twine check --strict dist/*
 
-  check:
-    name: Check
-    needs: [lint, test, build]
-    if: always()
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - name: require all checks to pass
-        env:
-          RESULTS: ${{ join(needs.*.result, ' ') }}
-        run: |
-          for result in $RESULTS; do
-            test "$result" = success || exit 1
-          done
-
   release:
     name: Tag tested releases
     needs: [lint, test, build]
