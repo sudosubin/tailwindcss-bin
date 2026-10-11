@@ -147,79 +147,14 @@ jobs:
           uv build --wheel --package tailwindcss-bin-tailwindcss-motion --out-dir .tox/linux-wheelhouse --build-constraint .tox/build-constraints.txt --require-hashes
           uv build --wheel --package tailwindcss-bin-tw-animate-css --out-dir .tox/linux-wheelhouse --build-constraint .tox/build-constraints.txt --require-hashes
 
-      - name: stage wheels for container tests
+      - name: test CSS, plugins, and native watch on Linux baselines
         env:
-          STAGING: ${{ runner.temp }}/linux-smoke
+          TAILWINDCSS_BIN_BASELINE_WHEELHOUSE: .tox/linux-wheelhouse
         run: |
-          uv run --frozen --only-group build python - <<'PY'
-          import os
-          import zipfile
-          from pathlib import Path
-
-          wheels = list(Path(".tox/linux-wheelhouse").glob("*.whl"))
-          plugins = [wheel for wheel in wheels if "-none-any.whl" in wheel.name]
-          assert len(plugins) == 2, plugins
-          for runtime, platform in [("glibc", "manylinux"), ("musl", "musllinux")]:
-              core = [wheel for wheel in wheels if platform in wheel.name]
-              assert len(core) == 1, core
-              staging = Path(os.environ["STAGING"]) / runtime
-              staging.mkdir(parents=True)
-              for wheel in [*core, *plugins]:
-                  with zipfile.ZipFile(wheel) as archive:
-                      archive.extractall(staging)
-              binary, = staging.glob("*.data/scripts/tailwindcss-bin")
-              binary.rename(staging / "tailwindcss-bin").chmod(0o755)
-          PY
-
-      - name: test plugins and native watch on glibc 2.24 and musl
-        env:
-          STAGING: ${{ runner.temp }}/linux-smoke
-        run: |
-          set -euo pipefail
-          node_path=/wheels/tailwindcss_bin/plugins/tailwindcss_motion/node_modules:/wheels/tailwindcss_bin/plugins/tw_animate_css/node_modules
-          for runtime in glibc musl; do
-            if [ "$runtime" = glibc ]; then image=debian:stretch-slim; else image=alpine:3.24; fi
-            docker run --rm -i --workdir /smoke -v "$STAGING/$runtime:/wheels:ro" \
-              -e "NODE_PATH=$node_path" "$image" sh -s <<'SH'
-          set -eu
-          if [ -f /etc/alpine-release ]; then apk add --no-cache libstdc++ libgcc; fi
-          binary=/wheels/tailwindcss-bin
-
-          cat > input.css <<'CSS'
-          @import "tailwindcss";
-          @import "tw-animate-css";
-          @plugin "tailwindcss-motion";
-          CSS
-          echo '<p class="animate-in motion-preset-fade bg-red-500"></p>' > index.html
-
-          "$binary" -i input.css -o minified.css --minify
-          grep -Fq '.animate-in' minified.css
-          grep -Fq '.motion-preset-fade' minified.css
-
-          "$binary" -i input.css -o watched.css --watch=always > watch.log 2>&1 &
-          watch_pid=$!
-
-          wait_for_selector() {
-              attempts=0
-              while [ "$attempts" -lt 100 ]; do
-                  if grep -Fq "$1" watched.css 2>/dev/null; then
-                      return 0
-                  fi
-                  if ! kill -0 "$watch_pid" 2>/dev/null; then break; fi
-                  attempts=$((attempts + 1))
-                  sleep 0.1
-              done
-              cat watch.log >&2
-              echo "Watcher did not produce $1" >&2
-              return 1
-          }
-
-          wait_for_selector '.bg-red-500'
-          echo '<p class="animate-in motion-preset-fade bg-blue-500"></p>' > index.html
-          wait_for_selector '.bg-blue-500'
-          echo 'Minify, plugins, and native watch rebuild passed.'
-          SH
-          done
+          uv sync --frozen --only-group test
+          uv run --frozen --only-group test pytest \
+            packages/tailwindcss-bin/tests/test_plugins.py::test_plugins_minify \
+            packages/tailwindcss-bin/tests/test_plugins.py::test_plugins_watch
 
   check:
     name: Check
