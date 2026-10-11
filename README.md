@@ -9,6 +9,12 @@ uv add --dev 'tailwindcss-bin[tailwindcss-motion,tw-animate-css]'
 uv run tailwindcss -i input.css -o output.css --minify
 ```
 
+Run without adding a project dependency:
+
+```sh
+uvx tailwindcss-bin -i input.css -o output.css --minify
+```
+
 ```css
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -23,7 +29,7 @@ uv run tailwindcss -i input.css -o output.css --minify
 
 The Python version follows the bundled upstream version. Development builds use
 `.devN`; packaging-only corrections use `.postN`. Pin a development version
-explicitly when testing it, for example `tailwindcss-bin==4.3.3.dev1`.
+explicitly when testing it, for example `tailwindcss-bin==4.3.3.dev2`.
 
 ## Platforms
 

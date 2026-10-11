@@ -141,7 +141,7 @@ class CustomBuildHook(BuildHookInterface):
             tag = tag.format(*min_os(binary.read_bytes(), arch))
 
         build_data["shared_scripts"][str(binary)] = (
-            f"tailwindcss-bin{binary.suffix}"
+            f"_tailwindcss-bin{binary.suffix}"
         )
         build_data["pure_python"] = False
         build_data["tag"] = f"py3-none-{tag}"

@@ -11,6 +11,12 @@ uv run tailwindcss -i input.css -o output.css --minify
 uv run tailwindcss -i input.css -o output.css --watch
 ```
 
+Run without adding a project dependency:
+
+```sh
+uvx tailwindcss-bin -i input.css -o output.css --minify
+```
+
 Optional plugins:
 
 ```sh
@@ -23,9 +29,9 @@ uv add --dev 'tailwindcss-bin[tailwindcss-motion,tw-animate-css]'
 @plugin "tailwindcss-motion";
 ```
 
-Both `tailwindcss` and `python -m tailwindcss_bin` configure `NODE_PATH` for
-installed plugin wheels. Run commands from the directory containing your CSS
-and templates, or use the Tailwind CLI's `--cwd` option.
+`tailwindcss`, `tailwindcss-bin`, and `python -m tailwindcss_bin` configure
+`NODE_PATH` for installed plugin wheels. Run commands from the directory
+containing your CSS and templates, or use the Tailwind CLI's `--cwd` option.
 
 For pip:
 
@@ -35,7 +41,7 @@ python -m tailwindcss_bin -i input.css -o output.css --minify
 ```
 
 The package version follows the bundled Tailwind CSS version. Development
-versions such as `4.3.3.dev1` require an explicit version pin or your installer's
+versions such as `4.3.3.dev2` require an explicit version pin or your installer's
 pre-release option. A `.postN` suffix identifies a packaging-only correction.
 
 ## Python API

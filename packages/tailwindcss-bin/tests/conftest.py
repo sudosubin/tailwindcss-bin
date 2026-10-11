@@ -18,13 +18,13 @@ def native_cli_command() -> list[str]:
     return [find_tailwindcss_bin()]
 
 
-@pytest.fixture(params=["binary", "console", "module"])
+@pytest.fixture(params=["binary", "tailwindcss", "tailwindcss-bin", "module"])
 def cli_command(request) -> list[str]:
     if request.param == "binary":
         return [find_tailwindcss_bin()]
     if request.param == "module":
         return [sys.executable, "-m", "tailwindcss_bin"]
-    exe = "tailwindcss" + (sysconfig.get_config_var("EXE") or "")
+    exe = request.param + (sysconfig.get_config_var("EXE") or "")
     return [str(Path(sysconfig.get_path("scripts")) / exe)]
 
 

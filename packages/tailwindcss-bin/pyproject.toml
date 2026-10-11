@@ -4,7 +4,7 @@ requires = [ "auditwheel>=6.8.2,<7", "hatchling>=1.27" ]
 
 [project]
 name = "tailwindcss-bin"
-version = "4.3.3.dev1"
+version = "4.3.3.dev2"
 description = "The Tailwind CSS standalone CLI, packaged as Python wheels."
 readme = "README.md"
 keywords = [ "binary", "cli", "css", "tailwind", "tailwindcss" ]
@@ -43,6 +43,7 @@ Upstream = "https://github.com/tailwindlabs/tailwindcss"
 
 [project.scripts]
 tailwindcss = "tailwindcss_bin.__main__:main"
+tailwindcss-bin = "tailwindcss_bin.__main__:main"
 
 [tool.hatch.build]
 targets.wheel.packages = [ "src/tailwindcss_bin" ]

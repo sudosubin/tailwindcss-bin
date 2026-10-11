@@ -9,7 +9,7 @@ class TailwindcssNotFound(FileNotFoundError): ...
 
 
 def bundled_cli_name() -> str:
-    return "tailwindcss-bin" + (sysconfig.get_config_var("EXE") or "")
+    return "_tailwindcss-bin" + (sysconfig.get_config_var("EXE") or "")
 
 
 def find_tailwindcss_bin() -> str:

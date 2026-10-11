@@ -29,6 +29,8 @@ def test_finds_recorded_binary(monkeypatch, tmp_path, site, scripts):
     binary = tmp_path / scripts / find.bundled_cli_name()
     binary.parent.mkdir(parents=True)
     binary.write_bytes(b"\x7fELF")
+    wrapper = binary.with_name(binary.name.removeprefix("_"))
+    wrapper.write_text("Python entry point")
     site = tmp_path / site
     info = site / "tailwindcss_bin-4.3.3.dist-info"
     info.mkdir(parents=True)
@@ -36,7 +38,8 @@ def test_finds_recorded_binary(monkeypatch, tmp_path, site, scripts):
         "Metadata-Version: 2.4\nName: tailwindcss-bin\nVersion: 4.3.3\n"
     )
     relative = Path(os.path.relpath(binary, site)).as_posix()
-    info.joinpath("RECORD").write_text(f"{relative},,\n")
+    wrapper_relative = Path(os.path.relpath(wrapper, site)).as_posix()
+    info.joinpath("RECORD").write_text(f"{wrapper_relative},,\n{relative},,\n")
     monkeypatch.setattr(find, "distribution", lambda _: PathDistribution(info))
 
     # An unrelated interpreter installation must not take precedence.
@@ -64,7 +67,7 @@ def test_missing_distribution(monkeypatch):
         find.find_tailwindcss_bin()
 
 
-@pytest.mark.parametrize("record", [None, "missing/tailwindcss-bin,,\n"])
+@pytest.mark.parametrize("record", [None, "missing/_tailwindcss-bin,,\n"])
 def test_missing_installed_binary(monkeypatch, tmp_path, record):
     info = tmp_path / "tailwindcss_bin-4.3.3.dist-info"
     info.mkdir()
