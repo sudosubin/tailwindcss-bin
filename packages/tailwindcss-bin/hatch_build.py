@@ -23,20 +23,41 @@ TARGETS = {
     "macos-x64": "macosx_{}_{}_x86_64",
     "windows-x64": "win_amd64",
 }
+# Shared x86_64/aarch64 C++ limits from auditwheel's manylinux policies.
+MANYLINUX_CXX = (
+    ((2, 17), (3, 4, 19), (1, 3, 7)),
+    ((2, 24), (3, 4, 22), (1, 3, 10)),
+    ((2, 27), (3, 4, 24), (1, 3, 11)),
+    ((2, 31), (3, 4, 28), (1, 3, 12)),
+    ((2, 34), (3, 4, 29), (1, 3, 13)),
+    ((2, 35), (3, 4, 30), (1, 3, 13)),
+    ((2, 39), (3, 4, 33), (1, 3, 15)),
+    ((2, 42), (3, 4, 34), (1, 3, 15)),
+)
 
 
 def detect_target() -> str:
+    systems = {"darwin": "macos", "win32": "windows", "linux": "linux"}
+    if sys.platform not in systems:
+        raise ValueError(f"unsupported operating system {sys.platform!r}")
     # Honors `_PYTHON_HOST_PLATFORM`, set by cibuildwheel when cross-building.
     machine = sysconfig.get_platform().split("-")[-1]
     if machine == "universal2":
         machine = platform.machine()
-    arch = "arm64" if machine.lower() in ("arm64", "aarch64") else "x64"
-    if sys.platform == "darwin":
-        return f"macos-{arch}"
-    if sys.platform == "win32":
-        return f"windows-{arch}"
-    musl = platform.libc_ver()[0] != "glibc"
-    return f"linux-{arch}" + ("-musl" if musl else "")
+    architectures = {
+        "arm64": "arm64",
+        "aarch64": "arm64",
+        "x86_64": "x64",
+        "amd64": "x64",
+    }
+    if machine.lower() not in architectures:
+        raise ValueError(f"unsupported architecture {machine!r}")
+    target = f"{systems[sys.platform]}-{architectures[machine.lower()]}"
+    if sys.platform == "linux" and platform.libc_ver()[0] != "glibc":
+        target += "-musl"
+    if target not in TARGETS:
+        raise ValueError(f"unsupported target {target!r}")
+    return target
 
 
 def _github_get(url: str) -> bytes:
@@ -69,7 +90,7 @@ def fetch(release: str, target: str, sha256: str) -> Path:
 
 
 def min_os(data: bytes) -> tuple[int, int]:
-    """Return the oldest macOS or newest glibc the binary needs."""
+    """Return the minimum macOS or manylinux baseline for the binary."""
     if data[:4] == b"\xcf\xfa\xed\xfe":
         (ncmds,) = struct.unpack_from("<I", data, 16)
         offset = 32
@@ -86,8 +107,22 @@ def min_os(data: bytes) -> tuple[int, int]:
         raise ValueError("no minimum macOS version")
 
     glibc = re.findall(rb"GLIBC_(\d+)\.(\d+)", data)
-    # manylinux2014 is the oldest baseline installers accept on aarch64.
-    return max([(2, 17), *((int(a), int(b)) for a, b in glibc)])
+    requirements = []
+    for family in (b"GLIBCXX", b"CXXABI"):
+        versions = re.findall(family + rb"_(\d+(?:\.\d+)+)", data)
+        requirements.append(
+            max(
+                (tuple(map(int, value.split(b"."))) for value in versions),
+                default=(0,),
+            )
+        )
+    glibcxx, cxxabi = requirements
+    for baseline, max_glibcxx, max_cxxabi in MANYLINUX_CXX:
+        if glibcxx <= max_glibcxx and cxxabi <= max_cxxabi:
+            return max([baseline, *((int(a), int(b)) for a, b in glibc)])
+    raise ValueError(
+        "binary requires a newer C++ ABI; update the manylinux policy limits"
+    )
 
 
 class CustomBuildHook(BuildHookInterface):
@@ -99,7 +134,9 @@ class CustomBuildHook(BuildHookInterface):
         release = Version(self.metadata.version).base_version
         pins = self.metadata.config["tool"]["tailwindcss-bin"]["sha256"]
         binary = fetch(release, target, pins[target])
-        tag = TARGETS[target].format(*min_os(binary.read_bytes()))
+        tag = TARGETS[target]
+        if "{}" in tag:
+            tag = tag.format(*min_os(binary.read_bytes()))
 
         build_data["shared_scripts"][str(binary)] = (
             f"tailwindcss-bin{binary.suffix}"
