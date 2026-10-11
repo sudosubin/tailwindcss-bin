@@ -44,12 +44,6 @@ Upstream = "https://github.com/tailwindlabs/tailwindcss"
 [project.scripts]
 tailwindcss = "tailwindcss_bin.__main__:main"
 
-[dependency-groups]
-tox = [
-  "tox==4.65.1",
-  "tox-uv==1.28.1",
-]
-
 [tool.hatch.build]
 targets.wheel.packages = [ "src/tailwindcss_bin" ]
 targets.wheel.hooks.custom = {}
@@ -61,12 +55,14 @@ tailwindcss-bin-tw-animate-css = { workspace = true }
 [tool.cibuildwheel]
 build = "cp314-*"
 archs = [ "native" ]
-build-frontend = "build[uv]"
+build-frontend = { name = "uv", args = [ "--build-constraint", ".tox/build-constraints.txt", "--require-hashes" ] }
 repair-wheel-command = ""
-test-command = "pytest tests/test_cli.py"
-test-sources = [ "tests" ]
-audit-command = "twine check --strict {wheel}"
-audit-requires = [ "twine" ]
+before-test = """\
+  uv pip install --require-hashes -r {project}/.tox/test-requirements.txt && uv pip install --no-index --no-deps --pre \
+  --find-links {project}/.tox/plugin-wheelhouse tailwindcss-bin-tailwindcss-motion tailwindcss-bin-tw-animate-css\
+  """
+test-command = "pytest packages/tailwindcss-bin/tests/test_cli.py packages/tailwindcss-bin/tests/test_plugins.py"
+test-sources = [ "packages/tailwindcss-bin/tests" ]
 
 [tool.cibuildwheel.macos]
 archs = [ "x86_64", "arm64" ]
@@ -76,30 +72,110 @@ testpaths = [ "tests" ]
 pythonpath = [ ".", "src" ]
 
 [tool.tox]
-requires = [ "tox==4.65.1", "tox-uv==1.28.1" ]
+requires = [ "tox>=4.65.2,<5", "tox-uv>=1.37,<2" ]
 env_list = [ "3.15", "3.14", "3.13", "3.12", "3.11", "build" ]
 
 [tool.tox.env.build]
 description = "Build workspace wheels into a shared wheelhouse"
 package = "skip"
+deps = []
 pass_env = [ "GITHUB_TOKEN", "TAILWINDCSS_BIN_TARGET" ]
 change_dir = "{toxinidir}/../.."
+commands_pre = []
 commands = [
-  [ "uv", "build", "--all-packages", "--wheel", "-o", ".tox/wheelhouse" ],
+  [
+    "python",
+    "-c",
+    """\
+  import pathlib, shutil; shutil.rmtree('.tox/wheelhouse', ignore_errors=True); \
+  pathlib.Path('.tox').mkdir(exist_ok=True)\
+  """,
+  ],
+  [
+    "uv",
+    "export",
+    "--frozen",
+    "--only-group",
+    "build",
+    "--no-emit-project",
+    "--output-file",
+    ".tox/build-constraints.txt",
+  ],
+  [
+    "uv",
+    "export",
+    "--frozen",
+    "--only-group",
+    "test",
+    "--no-emit-project",
+    "--output-file",
+    ".tox/test-requirements.txt"
+  ],
+  [
+    "uv",
+    "build",
+    "--package",
+    "tailwindcss-bin",
+    "--wheel",
+    "--build-constraint",
+    ".tox/build-constraints.txt",
+    "--require-hashes",
+    "-o",
+    ".tox/wheelhouse",
+  ],
+  [
+    "uv",
+    "build",
+    "--package",
+    "tailwindcss-bin-tailwindcss-motion",
+    "--wheel",
+    "--build-constraint",
+    ".tox/build-constraints.txt",
+    "--require-hashes",
+    "-o",
+    ".tox/wheelhouse",
+  ],
+  [
+    "uv",
+    "build",
+    "--package",
+    "tailwindcss-bin-tw-animate-css",
+    "--wheel",
+    "--build-constraint",
+    ".tox/build-constraints.txt",
+    "--require-hashes",
+    "-o",
+    ".tox/wheelhouse",
+  ],
 ]
 allowlist_externals = [ "uv" ]
+depends = []
 
 [tool.tox.env_run_base]
 package = "skip"
-deps = [
-  "hatchling>=1.27",
-  "packaging",
-  "pytest>=8",
-  "tailwindcss-bin[tailwindcss-motion,tw-animate-css]",
-]
+deps = [ "-r{toxinidir}/../../.tox/test-requirements.txt" ]
 pass_env = [ "TAILWINDCSS_BIN_TARGET" ]
-set_env = { UV_FIND_LINKS = "{toxinidir}/../../.tox/wheelhouse" }
+commands_pre = [
+  [
+    "uv",
+    "pip",
+    "install",
+    "--python",
+    "{envpython}",
+    "--no-index",
+    "--no-deps",
+    "--reinstall",
+    "--prerelease",
+    "allow",
+    "--find-links",
+    "{toxinidir}/../../.tox/wheelhouse",
+    "tailwindcss-bin",
+    "tailwindcss-bin-tailwindcss-motion",
+    "tailwindcss-bin-tw-animate-css",
+  ],
+]
 commands = [ [ "pytest", { replace = "posargs", extend = true } ] ]
+allowlist_externals = [ "uv" ]
 depends = [ "build" ]
 
 [tool.tailwindcss-bin.sha256]

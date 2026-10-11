@@ -1,3 +1,11 @@
+[dependency-groups]
+dev = [ { include-group = "test" }, { include-group = "maintenance" } ]
+test = [ { include-group = "build" }, "pytest==9.1.1" ]
+audit = [ "twine==7" ]
+build = [ "hatch-npm-vendor==0.1", "hatchling==1.32.4", "packaging==26.3" ]
+maintenance = [ "prek==0.5.5" ]
+tox = [ { include-group = "dev" }, "tox==4.65.2", "tox-uv==1.37" ]
+
 [tool.uv]
 package = false
 
@@ -13,3 +21,9 @@ extend-select = [ "B", "I", "UP" ]
 
 [tool.ty]
 src.include = [ "packages" ]
+environment.root = [
+  "packages/tailwindcss-bin/src",
+  "packages/tailwindcss-bin-tailwindcss-motion/src",
+  "packages/tailwindcss-bin-tw-animate-css/src",
+  ".",
+]
