@@ -64,8 +64,7 @@ processes. It preserves existing `NODE_PATH` entries.
 
 The Linux wheel tags account for both glibc and the executable's embedded C++
 libraries. Native file watching currently needs `GLIBCXX_3.4.22` and
-`CXXABI_1.3.9`. CI checks minification, both plugins, and native watch rebuilds on
-glibc 2.24 and musl.
+`CXXABI_1.3.9`.
 
 On Alpine:
 
