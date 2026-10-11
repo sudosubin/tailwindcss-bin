@@ -10,7 +10,7 @@ from packaging.version import Version
 def test_reports_bundled_version(cli_command):
     expected = Version(version("tailwindcss-bin")).base_version
     result = run_cmd(cli_command + ["--help"], check=True)
-    assert f"tailwindcss v{expected}" in result.stdout
+    assert f"v{expected}" in result.stdout.splitlines()[0]
 
 
 def test_compiles_css(tmp_path, cli_command):
