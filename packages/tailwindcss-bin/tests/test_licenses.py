@@ -49,7 +49,7 @@ def license_basenames(names: list[str]) -> set[str]:
     return {n.split("/licenses/", 1)[1] for n in names if "/licenses/" in n}
 
 
-def test_cli_wheel_licenses(cli_wheel, tmp_path):
+def test_cli_wheel_licenses(cli_wheel):
     config = tomllib.loads((PKG_ROOT / "pyproject.toml").read_text())
     expected = {
         path.relative_to(PKG_ROOT).as_posix()
@@ -59,16 +59,12 @@ def test_cli_wheel_licenses(cli_wheel, tmp_path):
     }
     with zipfile.ZipFile(cli_wheel) as archive:
         names = archive.namelist()
-    assert license_basenames(names) == expected
-    assert not any(".." in n for n in names)
-
-    dest = tmp_path / "extract"
-    dest.mkdir()
-    with zipfile.ZipFile(cli_wheel) as archive:
-        archive.extractall(dest)
-    licenses = next(dest.glob("tailwindcss_bin-*.dist-info/licenses"))
-    for path in expected:
-        assert (licenses / path).read_bytes() == (PKG_ROOT / path).read_bytes()
+        assert license_basenames(names) == expected
+        assert not any(".." in n for n in names)
+        for name in names:
+            if "/licenses/" in name:
+                source = PKG_ROOT / name.split("/licenses/", 1)[1]
+                assert archive.read(name) == source.read_bytes()
 
 
 def _assert_plugin_wheel_licenses(distributions, package, upstream_license):
