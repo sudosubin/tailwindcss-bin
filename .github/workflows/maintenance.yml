@@ -43,7 +43,7 @@ jobs:
         if: steps.existing.outputs.number == ''
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          assignees: sudosubin
+          reviewers: sudosubin
           branch: maintenance/pre-commit
           commit-message: "chore: Update pre-commit hooks"
           title: "chore: Update pre-commit hooks"

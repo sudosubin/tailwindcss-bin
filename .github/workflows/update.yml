@@ -147,7 +147,7 @@ jobs:
         if: steps.plan.outputs.changed == 'true'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          assignees: sudosubin
+          reviewers: sudosubin
           branch: ${{ steps.plan.outputs.branch }}
           commit-message: >-
             feat(${{ matrix.package }}): Update ${{ matrix.package }} to v${{ steps.plan.outputs.version }}
