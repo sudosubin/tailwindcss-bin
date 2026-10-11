@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,14 +20,18 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version-file: uv.lock
+          python-version: "3.14"
 
       - name: verify uv.lock
         run: uv lock --check
 
-      - uses: j178/prek-action@1382ad72dea72f9d53832f2bcb65b3e87a947204 # v3.0.1
+      - name: run pre-commit hooks
+        run: uv run --frozen --only-group dev prek run --all-files --show-diff-on-failure
 
   test:
     name: Test (${{ matrix.python }})
@@ -39,16 +44,19 @@ jobs:
         python: ["3.11", "3.12", "3.13", "3.14", "3.15"]
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version-file: uv.lock
+          python-version: ${{ matrix.python }}
 
       - name: run the tests
         env:
           PYTHON: ${{ matrix.python }}
         run: |
-          uv sync --frozen --package tailwindcss-bin --only-group tox
-          uv run tox -c packages/tailwindcss-bin -e "$PYTHON"
+          uv sync --frozen --only-group tox
+          uv run --frozen --only-group tox tox -c packages/tailwindcss-bin -e "build,$PYTHON" --parallel 1
 
   build:
     name: Build (${{ matrix.package }} / ${{ matrix.runner }})
@@ -79,12 +87,28 @@ jobs:
             method: uv
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-        if: matrix.method == 'uv'
+        with:
+          version-file: uv.lock
+          python-version: "3.14"
 
-      - uses: pypa/cibuildwheel@adba99c781d3746d38b3a09b1cf797965bcb7fe6 # v4.3.0
+      - name: export build constraints
+        shell: bash
+        run: |
+          mkdir -p .tox
+          uv export --frozen --only-group build --no-emit-project -o .tox/build-constraints.txt
+          uv export --frozen --only-group test --no-emit-project -o .tox/test-requirements.txt
+
+      - name: build plugin wheels for platform tests
+        if: matrix.method == 'cibuildwheel'
+        shell: bash
+        run: |
+          uv build --wheel --package tailwindcss-bin-tailwindcss-motion --out-dir .tox/plugin-wheelhouse --build-constraint .tox/build-constraints.txt --require-hashes
+          uv build --wheel --package tailwindcss-bin-tw-animate-css --out-dir .tox/plugin-wheelhouse --build-constraint .tox/build-constraints.txt --require-hashes
+
+      - uses: pypa/cibuildwheel@b3395e271a35f73dad77f21802abe9b986dfe299 # v4.3.1
         if: matrix.method == 'cibuildwheel'
         with:
           package-dir: packages/${{ matrix.package }}
@@ -92,4 +116,198 @@ jobs:
 
       - name: build the wheel
         if: matrix.method == 'uv'
-        run: uv build --wheel --package "${{ matrix.package }}"
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: uv build --sdist --wheel --package "$PACKAGE" --build-constraint .tox/build-constraints.txt --require-hashes
+
+      - name: validate wheel metadata
+        shell: bash
+        env:
+          METHOD: ${{ matrix.method }}
+        run: |
+          if [ "$METHOD" = cibuildwheel ]; then directory=wheelhouse; else directory=dist; fi
+          uv run --frozen --only-group audit twine check --strict "$directory"/*
+
+  linux-baseline:
+    name: Linux baseline
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version-file: uv.lock
+          python-version: "3.14"
+
+      - name: build wheels for both Linux runtimes
+        run: |
+          mkdir -p .tox
+          uv export --frozen --only-group build --no-emit-project -o .tox/build-constraints.txt
+          for target in linux-x64 linux-x64-musl; do
+            TAILWINDCSS_BIN_TARGET="$target" uv build --wheel --package tailwindcss-bin --out-dir .tox/linux-wheelhouse --build-constraint .tox/build-constraints.txt --require-hashes
+          done
+          uv build --wheel --package tailwindcss-bin-tailwindcss-motion --out-dir .tox/linux-wheelhouse --build-constraint .tox/build-constraints.txt --require-hashes
+          uv build --wheel --package tailwindcss-bin-tw-animate-css --out-dir .tox/linux-wheelhouse --build-constraint .tox/build-constraints.txt --require-hashes
+
+      - name: stage wheels for container tests
+        env:
+          STAGING: ${{ runner.temp }}/linux-smoke
+        run: |
+          uv run --frozen --only-group build python - <<'PY'
+          import os
+          import zipfile
+          from pathlib import Path
+
+          wheels = list(Path(".tox/linux-wheelhouse").glob("*.whl"))
+          plugins = [wheel for wheel in wheels if "-none-any.whl" in wheel.name]
+          assert len(plugins) == 2, plugins
+          for runtime, platform in [("glibc", "manylinux"), ("musl", "musllinux")]:
+              core = [wheel for wheel in wheels if platform in wheel.name]
+              assert len(core) == 1, core
+              staging = Path(os.environ["STAGING"]) / runtime
+              staging.mkdir(parents=True)
+              for wheel in [*core, *plugins]:
+                  with zipfile.ZipFile(wheel) as archive:
+                      archive.extractall(staging)
+              binary, = staging.glob("*.data/scripts/tailwindcss-bin")
+              binary.chmod(0o755)
+              (staging / "binary-path").write_text(str(binary.relative_to(staging)))
+          PY
+
+      - name: test plugins and native watch on glibc 2.24 and musl
+        env:
+          STAGING: ${{ runner.temp }}/linux-smoke
+        run: |
+          set -euo pipefail
+          node_path=/wheels/tailwindcss_bin/plugins/tailwindcss_motion/node_modules:/wheels/tailwindcss_bin/plugins/tw_animate_css/node_modules
+          for runtime in glibc musl; do
+            if [ "$runtime" = glibc ]; then image=debian:stretch-slim; else image=alpine:3.24; fi
+            binary=$(cat "$STAGING/$runtime/binary-path")
+            docker run --rm -i -v "$STAGING/$runtime:/wheels:ro" \
+              -e "NODE_PATH=$node_path" "$image" sh -s -- "/wheels/$binary" <<'SH'
+          set -eu
+          if [ -f /etc/alpine-release ]; then apk add --no-cache libstdc++ libgcc; fi
+          binary=$1
+          smoke_dir=$(mktemp -d)
+          watch_pid=
+          cleanup() {
+              if [ -n "$watch_pid" ]; then
+                  kill "$watch_pid" 2>/dev/null || true
+                  wait "$watch_pid" 2>/dev/null || true
+              fi
+              rm -rf "$smoke_dir"
+          }
+          trap cleanup EXIT
+
+          cat > "$smoke_dir/input.css" <<'CSS'
+          @import "tailwindcss";
+          @import "tw-animate-css";
+          @plugin "tailwindcss-motion";
+          CSS
+          echo '<p class="animate-in motion-preset-fade bg-red-500"></p>' > "$smoke_dir/index.html"
+
+          "$binary" --cwd "$smoke_dir" -i input.css -o minified.css --minify
+          grep -Fq '.animate-in' "$smoke_dir/minified.css"
+          grep -Fq '.motion-preset-fade' "$smoke_dir/minified.css"
+
+          "$binary" --cwd "$smoke_dir" -i input.css -o watched.css --watch=always \
+              > "$smoke_dir/watch.log" 2>&1 &
+          watch_pid=$!
+
+          wait_for_selector() {
+              attempts=0
+              while [ "$attempts" -lt 100 ]; do
+                  if grep -Fq "$1" "$smoke_dir/watched.css" 2>/dev/null; then
+                      return 0
+                  fi
+                  if ! kill -0 "$watch_pid" 2>/dev/null; then break; fi
+                  attempts=$((attempts + 1))
+                  sleep 0.1
+              done
+              cat "$smoke_dir/watch.log" >&2
+              echo "Watcher did not produce $1" >&2
+              return 1
+          }
+
+          wait_for_selector '.bg-red-500'
+          echo '<p class="animate-in motion-preset-fade bg-blue-500"></p>' > "$smoke_dir/index.html"
+          wait_for_selector '.bg-blue-500'
+          echo 'Minify, plugins, and native watch rebuild passed.'
+          SH
+          done
+
+  check:
+    name: Check
+    needs: [lint, test, build, linux-baseline]
+    if: always()
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: require all checks to pass
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $RESULTS; do
+            test "$result" = success || exit 1
+          done
+
+  release:
+    name: Tag tested releases
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version-file: uv.lock
+          python-version: "3.14"
+
+      - name: tag and dispatch unpublished versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          uv run --frozen --only-group build python - <<'PY' > "$RUNNER_TEMP/release-versions.txt"
+          import tomllib
+          from pathlib import Path
+          from packaging.version import Version
+
+          for path in sorted(Path("packages").glob("*/pyproject.toml")):
+              project = tomllib.loads(path.read_text())["project"]
+              version = Version(project["version"])
+              if not (version.is_prerelease or version.is_devrelease or version.epoch or version.local):
+                  print(project["name"], project["version"])
+          PY
+          while read -r package version; do
+            tag="$package@v$version"
+            if ! git show-ref --verify --quiet "refs/tags/$tag"; then
+              git tag "$tag" "$GITHUB_SHA"
+              git push origin "refs/tags/$tag"
+            fi
+            status=$(curl -sS --retry 3 -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/$package/$version/json")
+            case "$status" in
+              200|404) ;;
+              *) echo "PyPI returned HTTP $status for $package $version" >&2; exit 1 ;;
+            esac
+            tag_sha=$(git rev-parse "$tag^{commit}")
+            state=$(gh run list --workflow release.yml --commit "$tag_sha" --limit 100 \
+              --json databaseId,displayTitle,headSha,status,conclusion | \
+              jq -r --arg title "Release $tag" --arg sha "$tag_sha" '
+                [.[] | select(.displayTitle == $title and .headSha == $sha)] | max_by(.databaseId) |
+                if . == null then "missing"
+                elif .status != "completed" then "running"
+                elif .conclusion == "success" then "success"
+                else "retry" end')
+            if [ "$state" = running ] || { [ "$status" = 200 ] && [ "$state" = success ]; }; then
+              continue
+            fi
+            gh workflow run release.yml --ref "$tag"
+          done < "$RUNNER_TEMP/release-versions.txt"
