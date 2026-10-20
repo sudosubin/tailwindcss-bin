@@ -4,7 +4,7 @@ test = [ { include-group = "build" }, "pytest==9.1.1" ]
 audit = [ "twine==7" ]
 build = [ "auditwheel==6.8.2", "hatch-npm-vendor==0.1", "hatchling==1.32.4", "packaging==26.3" ]
 maintenance = [ "prek==0.5.5" ]
-tox = [ "tox==4.65.2", "tox-uv==1.37" ]
+tox = [ "tox==4.65.5", "tox-uv==1.37" ]
 
 [tool.uv]
 package = false
