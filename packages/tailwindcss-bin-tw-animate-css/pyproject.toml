@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "hatchling.build"
-requires = [ "hatch-npm-vendor>=0.1,<0.2", "hatchling>=1.27" ]
+requires = [ "hatch-npm-vendor>=0.1,<0.2", "hatchling>=1.33.0" ]
 
 [project]
 name = "tailwindcss-bin-tw-animate-css"
