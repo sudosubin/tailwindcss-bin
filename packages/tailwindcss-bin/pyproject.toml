@@ -1,41 +1,25 @@
 [build-system]
 build-backend = "hatchling.build"
-requires = [ "auditwheel>=6.8.2,<7", "hatchling>=1.27" ]
+requires = ["auditwheel>=6.8.2,<7", "hatchling>=1.27"]
 
 [project]
 name = "tailwindcss-bin"
-version = "4.3.3"
+version = "4.3.4"
 description = "The Tailwind CSS standalone CLI, packaged as Python wheels."
 readme = "README.md"
-keywords = [ "binary", "cli", "css", "tailwind", "tailwindcss" ]
+keywords = ["binary", "cli", "css", "tailwind", "tailwindcss"]
 license = "MIT"
-license-files = [ "LICENSE", "LICENSE-tailwindcss" ]
+license-files = ["LICENSE", "LICENSE-tailwindcss"]
 requires-python = ">=3.11"
-classifiers = [
-  "Development Status :: 5 - Production/Stable",
-  "Environment :: Console",
-  "Intended Audience :: Developers",
-  "Operating System :: MacOS",
-  "Operating System :: Microsoft :: Windows",
-  "Operating System :: POSIX :: Linux",
-  "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3.14",
-  "Programming Language :: Python :: 3.15",
-  "Topic :: Software Development :: Build Tools",
-  "Topic :: Text Processing :: Markup",
-]
+classifiers = ["Development Status :: 5 - Production/Stable", "Environment :: Console", "Intended Audience :: Developers", "Operating System :: MacOS", "Operating System :: Microsoft :: Windows", "Operating System :: POSIX :: Linux", "Programming Language :: Python :: 3 :: Only", "Programming Language :: Python :: 3.11", "Programming Language :: Python :: 3.12", "Programming Language :: Python :: 3.13", "Programming Language :: Python :: 3.14", "Programming Language :: Python :: 3.15", "Topic :: Software Development :: Build Tools", "Topic :: Text Processing :: Markup"]
 dependencies = []
-
 [[project.authors]]
 name = "sudosubin"
 email = "sudosubin@gmail.com"
 
 [project.optional-dependencies]
-tailwindcss-motion = [ "tailwindcss-bin-tailwindcss-motion" ]
-tw-animate-css = [ "tailwindcss-bin-tw-animate-css" ]
+tailwindcss-motion = ["tailwindcss-bin-tailwindcss-motion"]
+tw-animate-css = ["tailwindcss-bin-tw-animate-css"]
 
 [project.urls]
 Repository = "https://github.com/sudosubin/tailwindcss-bin"
@@ -45,145 +29,59 @@ Upstream = "https://github.com/tailwindlabs/tailwindcss"
 tailwindcss = "tailwindcss_bin.__main__:main"
 tailwindcss-bin = "tailwindcss_bin.__main__:main"
 
-[tool.hatch.build]
-targets.wheel.packages = [ "src/tailwindcss_bin" ]
-targets.wheel.hooks.custom = {}
+[tool.hatch.build.targets.wheel]
+packages = ["src/tailwindcss_bin"]
 
+[tool.hatch.build.targets.wheel.hooks]
+custom = {  }
 [tool.uv.sources]
 tailwindcss-bin-tailwindcss-motion = { workspace = true }
 tailwindcss-bin-tw-animate-css = { workspace = true }
-
 [tool.cibuildwheel]
 build = "cp314-*"
-archs = [ "native" ]
-build-frontend = { name = "uv", args = [ "--build-constraint", ".tox/build-constraints.txt", "--require-hashes" ] }
+archs = ["native"]
+build-frontend = { name = "uv", args = ["--build-constraint", ".tox/build-constraints.txt", "--require-hashes"] }
 repair-wheel-command = ""
-before-test = """\
-  uv pip install --require-hashes -r {project}/.tox/test-requirements.txt && uv pip install --no-index --no-deps --pre \
-  --find-links {project}/.tox/plugin-wheelhouse tailwindcss-bin-tailwindcss-motion tailwindcss-bin-tw-animate-css\
-  """
+before-test = "uv pip install --require-hashes -r {project}/.tox/test-requirements.txt && uv pip install --no-index --no-deps --pre --find-links {project}/.tox/plugin-wheelhouse tailwindcss-bin-tailwindcss-motion tailwindcss-bin-tw-animate-css"
 test-command = "pytest packages/tailwindcss-bin/tests/test_cli.py packages/tailwindcss-bin/tests/test_plugins.py"
-test-sources = [ "packages/tailwindcss-bin/tests" ]
+test-sources = ["packages/tailwindcss-bin/tests"]
 
 [tool.cibuildwheel.macos]
-archs = [ "x86_64", "arm64" ]
+archs = ["x86_64", "arm64"]
 
 [tool.pytest.ini_options]
-testpaths = [ "tests" ]
-pythonpath = [ ".", "src" ]
+testpaths = ["tests"]
+pythonpath = [".", "src"]
 
 [tool.tox]
-requires = [ "tox>=4.65.2,<5", "tox-uv>=1.37,<2" ]
-env_list = [ "3.15", "3.14", "3.13", "3.12", "3.11", "build" ]
+requires = ["tox>=4.65.2,<5", "tox-uv>=1.37,<2"]
+env_list = ["3.15", "3.14", "3.13", "3.12", "3.11", "build"]
 
 [tool.tox.env.build]
 description = "Build workspace wheels into a shared wheelhouse"
 package = "skip"
 deps = []
-pass_env = [ "GITHUB_TOKEN", "TAILWINDCSS_BIN_TARGET" ]
+pass_env = ["GITHUB_TOKEN", "TAILWINDCSS_BIN_TARGET"]
 change_dir = "{toxinidir}/../.."
 commands_pre = []
-commands = [
-  [
-    "python",
-    "-c",
-    """\
-  import pathlib, shutil; shutil.rmtree('.tox/wheelhouse', ignore_errors=True); \
-  pathlib.Path('.tox').mkdir(exist_ok=True)\
-  """,
-  ],
-  [
-    "uv",
-    "export",
-    "--frozen",
-    "--only-group",
-    "build",
-    "--no-emit-project",
-    "--output-file",
-    ".tox/build-constraints.txt",
-  ],
-  [
-    "uv",
-    "export",
-    "--frozen",
-    "--only-group",
-    "test",
-    "--no-emit-project",
-    "--output-file",
-    ".tox/test-requirements.txt"
-  ],
-  [
-    "uv",
-    "build",
-    "--package",
-    "tailwindcss-bin",
-    "--wheel",
-    "--build-constraint",
-    ".tox/build-constraints.txt",
-    "--require-hashes",
-    "-o",
-    ".tox/wheelhouse",
-  ],
-  [
-    "uv",
-    "build",
-    "--package",
-    "tailwindcss-bin-tailwindcss-motion",
-    "--wheel",
-    "--build-constraint",
-    ".tox/build-constraints.txt",
-    "--require-hashes",
-    "-o",
-    ".tox/wheelhouse",
-  ],
-  [
-    "uv",
-    "build",
-    "--package",
-    "tailwindcss-bin-tw-animate-css",
-    "--wheel",
-    "--build-constraint",
-    ".tox/build-constraints.txt",
-    "--require-hashes",
-    "-o",
-    ".tox/wheelhouse",
-  ],
-]
-allowlist_externals = [ "uv" ]
+commands = [["python", "-c", "import pathlib, shutil; shutil.rmtree('.tox/wheelhouse', ignore_errors=True); pathlib.Path('.tox').mkdir(exist_ok=True)"], ["uv", "export", "--frozen", "--only-group", "build", "--no-emit-project", "--output-file", ".tox/build-constraints.txt"], ["uv", "export", "--frozen", "--only-group", "test", "--no-emit-project", "--output-file", ".tox/test-requirements.txt"], ["uv", "build", "--package", "tailwindcss-bin", "--wheel", "--build-constraint", ".tox/build-constraints.txt", "--require-hashes", "-o", ".tox/wheelhouse"], ["uv", "build", "--package", "tailwindcss-bin-tailwindcss-motion", "--wheel", "--build-constraint", ".tox/build-constraints.txt", "--require-hashes", "-o", ".tox/wheelhouse"], ["uv", "build", "--package", "tailwindcss-bin-tw-animate-css", "--wheel", "--build-constraint", ".tox/build-constraints.txt", "--require-hashes", "-o", ".tox/wheelhouse"]]
+allowlist_externals = ["uv"]
 depends = []
 
 [tool.tox.env_run_base]
 package = "skip"
-deps = [ "-r{toxinidir}/../../.tox/test-requirements.txt" ]
-pass_env = [ "TAILWINDCSS_BIN_TARGET" ]
-commands_pre = [
-  [
-    "uv",
-    "pip",
-    "install",
-    "--python",
-    "{envpython}",
-    "--no-index",
-    "--no-deps",
-    "--reinstall",
-    "--prerelease",
-    "allow",
-    "--find-links",
-    "{toxinidir}/../../.tox/wheelhouse",
-    "tailwindcss-bin",
-    "tailwindcss-bin-tailwindcss-motion",
-    "tailwindcss-bin-tw-animate-css",
-  ],
-]
-commands = [ [ "pytest", { replace = "posargs", extend = true } ] ]
-allowlist_externals = [ "uv" ]
-depends = [ "build" ]
+deps = ["-r{toxinidir}/../../.tox/test-requirements.txt"]
+pass_env = ["TAILWINDCSS_BIN_TARGET"]
+commands_pre = [["uv", "pip", "install", "--python", "{envpython}", "--no-index", "--no-deps", "--reinstall", "--prerelease", "allow", "--find-links", "{toxinidir}/../../.tox/wheelhouse", "tailwindcss-bin", "tailwindcss-bin-tailwindcss-motion", "tailwindcss-bin-tw-animate-css"]]
+commands = [["pytest", { replace = "posargs", extend = true }]]
+allowlist_externals = ["uv"]
+depends = ["build"]
 
 [tool.tailwindcss-bin.sha256]
-linux-arm64 = "55fd0b241214eff3de1e8ee4f22796662f2d2e7a49bcfca7477cfd0bac398195"
-linux-arm64-musl = "71ea4be79c9de9827545682df3e040053fb535d37c71ed2cfdedf9385a0868e0"
-linux-x64 = "dc61b3ac6b8c9ca874c0cc4c57b2409791a64c5540404ca5f5367360babc313a"
-linux-x64-musl = "a04d34ceacc8f52cbe8920ad846cdeb61d3d0021dba32db0d1f77c9d9fad7a6c"
-macos-arm64 = "cdf646702987a743464dff4d9c60fd4480d1c1e73dd819a9a67f1078815dce9d"
-macos-x64 = "7922e0953f2110c05976e3bf58f14e643d90427575e766b7d433f5f80cbee7e1"
-windows-x64 = "e0e260ce048014e9268f6237ff18f8ccf02cef521cbd0ae04e82c2cdf7aa3955"
+-linux-arm64 = "f6d7baae1d350ed3a2defe98d0b5cc58e37400c0173b2e38d42f690ccc4bbfe1"
+-linux-arm64-musl = "64853a5d1321b9622eeceb16e28d26889fca409e3b1a2f95453088f776461e44"
+-linux-x64 = "149a8ece5b855587a9c10de6da9dcbcfad0e47c4ed5dca219f721b3eae39d817"
+-linux-x64-musl = "2a5456987c41ce3311e423b603842af425ea5ac44505162dd348d43ed3b909fd"
+-macos-arm64 = "a516a11b439bfbb5ecd4a2d13b75e6cdcc284dc710aed8731e31d2e5c03895a4"
+-macos-x64 = "7ec771593a1fb8bbd204f70429361b0158f7989e4136bc68d04513bf543a15ba"
+-windows-x64 = "ad84612696f3be102fa005d4827f0df84c7b4570d31c06865ce5fde0311478af"
