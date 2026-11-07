@@ -14,24 +14,24 @@ audit = [{ name = "twine", specifier = "==7" }]
 build = [
     { name = "auditwheel", specifier = "==6.8.2" },
     { name = "hatch-npm-vendor", specifier = "==0.1" },
-    { name = "hatchling", specifier = "==1.33.0" },
+    { name = "hatchling", specifier = "==1.33" },
     { name = "packaging", specifier = "==26.3" },
 ]
 dev = [
     { name = "auditwheel", specifier = "==6.8.2" },
     { name = "hatch-npm-vendor", specifier = "==0.1" },
-    { name = "hatchling", specifier = "==1.33.0" },
+    { name = "hatchling", specifier = "==1.33" },
     { name = "packaging", specifier = "==26.3" },
     { name = "prek", specifier = "==0.5.7" },
-    { name = "pytest", specifier = "==9.2.0" },
+    { name = "pytest", specifier = "==9.2" },
 ]
 maintenance = [{ name = "prek", specifier = "==0.5.7" }]
 test = [
     { name = "auditwheel", specifier = "==6.8.2" },
     { name = "hatch-npm-vendor", specifier = "==0.1" },
-    { name = "hatchling", specifier = "==1.33.0" },
+    { name = "hatchling", specifier = "==1.33" },
     { name = "packaging", specifier = "==26.3" },
-    { name = "pytest", specifier = "==9.2.0" },
+    { name = "pytest", specifier = "==9.2" },
 ]
 tox = [
     { name = "tox", specifier = "==4.67.4" },
@@ -765,7 +765,7 @@ wheels = [
 
 [[package]]
 name = "tailwindcss-bin"
-version = "4.3.3"
+version = "4.3.5"
 source = { editable = "packages/tailwindcss-bin" }
 
 [package.optional-dependencies]
