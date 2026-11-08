@@ -3,8 +3,8 @@ dev = [ { include-group = "test" }, { include-group = "maintenance" } ]
 test = [ { include-group = "build" }, "pytest==9.2" ]
 audit = [ "twine==7" ]
 build = [ "auditwheel==6.8.2", "hatch-npm-vendor==0.1", "hatchling==1.33", "packaging==26.3" ]
-maintenance = [ "prek==0.5.7" ]
-tox = [ "tox==4.67.4", "tox-uv==1.37.2" ]
+maintenance = [ "prek==0.5.10" ]
+tox = [ "tox==4.67.11", "tox-uv==1.37.5" ]
 
 [tool.uv]
 package = false
