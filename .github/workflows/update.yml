@@ -136,14 +136,21 @@ jobs:
           gh release view "v$VERSION" --repo tailwindlabs/tailwindcss --json assets --jq '
             [.assets[]
               | select(.name | startswith("tailwindcss-"))
-              | {(.name[11:] | rtrimstr(".exe")): (.digest // error("\(.name) has no digest") | .[7:])}
+              | {(.name | ltrimstr("tailwindcss-") | rtrimstr(".exe")): (.digest // error("\(.name) has no digest") | .[7:])}
             ] | add' > "$RUNNER_TEMP/pins.json"
           curl -fsSL "https://raw.githubusercontent.com/tailwindlabs/tailwindcss/v$VERSION/LICENSE" \
             -o "$PKG_DIR/LICENSE-tailwindcss"
-          yq -i -p=toml -o=toml \
-            ".project.version = \"$VERSION\" |
-             .tool.\"tailwindcss-bin\".sha256 = load(\"$RUNNER_TEMP/pins.json\")" \
-            "$PKG_DIR/pyproject.toml"
+          # Edit values in place; rewriting the file with yq discards its formatting.
+          uv version --package "$PACKAGE" --frozen "$VERSION"
+          jq -r 'to_entries[] | "\(.key) \(.value)"' "$RUNNER_TEMP/pins.json" |
+            while read -r target sha256; do
+              sed -i "s|^$target = \"[0-9a-f]*\"$|$target = \"$sha256\"|" "$PKG_DIR/pyproject.toml"
+            done
+          yq -p=toml -oj '.tool."tailwindcss-bin".sha256' "$PKG_DIR/pyproject.toml" |
+            jq -e --slurpfile pins "$RUNNER_TEMP/pins.json" '. == $pins[0]' > /dev/null || {
+              echo "pinned sha256 targets do not match the v$VERSION release assets" >&2
+              exit 1
+            }
 
       - name: apply plugin update
         if: matrix.package != 'tailwindcss-bin' && steps.plan.outputs.changed == 'true'
@@ -155,11 +162,22 @@ jobs:
           license=$(yq -p=toml -oy '.tool."tailwindcss-bin".plugin.upstream-license' "$PKG_DIR/pyproject.toml")
           meta=$(curl -fsSL "https://registry.npmjs.org/$NPM/$VERSION")
           curl -fsSL "$(jq -r .dist.tarball <<<"$meta")" | tar -xzf - -O package/LICENSE > "$PKG_DIR/$license"
-          yq -i -p=toml -o=toml \
-            ".project.version = \"$VERSION\" |
-             .tool.hatch.build.targets.wheel.hooks.\"npm-vendor\".packages[0].version = \"$VERSION\" |
-             .tool.hatch.build.targets.wheel.hooks.\"npm-vendor\".packages[0].integrity = \"$(jq -r .dist.integrity <<<"$meta")\"" \
+          integrity=$(jq -r .dist.integrity <<<"$meta")
+          # Edit values in place; rewriting the file with yq discards its formatting.
+          uv version --package "$PACKAGE" --frozen "$VERSION"
+          sed -i \
+            -e '/^\[\[tool\.hatch\.build\.targets\.wheel\.hooks\.npm-vendor\.packages\]\]$/,/^$/{' \
+            -e "s|^version = \".*\"$|version = \"$VERSION\"|" \
+            -e "s|^integrity = \".*\"$|integrity = \"$integrity\"|" \
+            -e '}' \
             "$PKG_DIR/pyproject.toml"
+          yq -p=toml -oj '.tool.hatch.build.targets.wheel.hooks."npm-vendor".packages' "$PKG_DIR/pyproject.toml" |
+            jq -e --arg npm "$NPM" --arg version "$VERSION" --arg integrity "$integrity" '
+              length == 1 and .[0].package == $npm and
+              .[0].version == $version and .[0].integrity == $integrity' > /dev/null || {
+              echo "failed to pin $NPM@$VERSION in $PKG_DIR/pyproject.toml" >&2
+              exit 1
+            }
 
       - name: lock the workspace
         if: steps.plan.outputs.changed == 'true'
