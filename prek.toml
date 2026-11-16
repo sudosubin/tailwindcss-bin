@@ -10,7 +10,7 @@ hooks = [
 
 [[repos]]
 repo = "https://github.com/tox-dev/pyproject-fmt"
-rev = "v2.30.3"
+rev = "v2.30.6"
 
 [[repos.hooks]]
 id = "pyproject-fmt"
@@ -23,10 +23,10 @@ args = [
 
 [[repos]]
 repo = "https://github.com/astral-sh/ruff-pre-commit"
-rev = "v0.17.3"
+rev = "v0.17.5"
 hooks = [{ id = "ruff-check", args = ["--fix"] }, { id = "ruff-format" }]
 
 [[repos]]
 repo = "https://github.com/astral-sh/ty-pre-commit"
-rev = "v0.0.95"
+rev = "v0.0.104"
 hooks = [{ id = "ty" }]
